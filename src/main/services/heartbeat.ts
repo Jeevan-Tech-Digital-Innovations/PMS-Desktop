@@ -1,0 +1,92 @@
+import { logger } from '../utils/logger';
+import { authStore } from '../utils/authStore';
+
+const HEARTBEAT_INTERVAL_MS = Number(process.env.HEARTBEAT_INTERVAL_MS) || 300_000; // 5 min
+const API_BASE = process.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
+
+let heartbeatHandle: ReturnType<typeof setInterval> | null = null;
+let timeLogId: number | null = null;
+let startTime: string | null = null;
+
+interface HeartbeatPayload {
+  timeLogId: number;
+  startTime: string;
+  currentDurationMinutes: number;
+}
+
+/**
+ * Starts periodic heartbeat syncing to the backend.
+ * Pings every N minutes to persist current time progress.
+ */
+export function startHeartbeat(logId: number, start: string): void {
+  timeLogId = logId;
+  startTime = start;
+
+  heartbeatHandle = setInterval(async () => {
+    await syncHeartbeat();
+  }, HEARTBEAT_INTERVAL_MS);
+
+  logger.info(`Heartbeat started for timeLogId: ${logId}`);
+}
+
+/**
+ * Stops the heartbeat sync.
+ */
+export function stopHeartbeat(): void {
+  if (heartbeatHandle) {
+    clearInterval(heartbeatHandle);
+    heartbeatHandle = null;
+  }
+  timeLogId = null;
+  startTime = null;
+  logger.info('Heartbeat stopped');
+}
+
+/**
+ * Sends a single heartbeat ping to the backend.
+ */
+async function syncHeartbeat(): Promise<void> {
+  if (!timeLogId || !startTime) return;
+
+  const { accessToken } = authStore.getTokens();
+  if (!accessToken) {
+    logger.warn('Heartbeat skipped: no access token');
+    return;
+  }
+
+  const elapsedMinutes = Math.round(
+    (Date.now() - new Date(startTime).getTime()) / 60_000,
+  );
+
+  const payload: HeartbeatPayload = {
+    timeLogId,
+    startTime,
+    currentDurationMinutes: elapsedMinutes,
+  };
+
+  try {
+    const response = await fetch(`${API_BASE}/tasks/time-logs/${timeLogId}/heartbeat`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.ok) {
+      logger.debug(`Heartbeat synced: ${elapsedMinutes}min elapsed`);
+    } else {
+      logger.warn(`Heartbeat failed: ${response.status}`);
+    }
+  } catch (error) {
+    logger.error('Heartbeat network error', error);
+  }
+}
+
+/**
+ * Immediately fires one heartbeat (e.g., before stopping timer).
+ */
+export async function flushHeartbeat(): Promise<void> {
+  await syncHeartbeat();
+}

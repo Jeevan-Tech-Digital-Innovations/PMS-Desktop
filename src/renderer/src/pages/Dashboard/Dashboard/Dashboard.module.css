@@ -1,0 +1,194 @@
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.statusSection {
+  text-align: center;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.statusReady {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.statusReady .statusDot {
+  background: #94a3b8;
+}
+
+.statusWorking {
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.statusWorking .statusDot {
+  background: #22c55e;
+}
+
+.statusPaused {
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.statusPaused .statusDot {
+  background: #f59e0b;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+
+.timerSection {
+  text-align: center;
+  padding: 2rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.timer {
+  font-size: 3.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #1e293b;
+  letter-spacing: -0.025em;
+}
+
+.counters {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin-top: 1rem;
+}
+
+.counter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.counterLabel {
+  font-size: 0.75rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.counterValue {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+  font-variant-numeric: tabular-nums;
+}
+
+.projectCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.projectInfo {
+  min-width: 0;
+}
+
+.projectName {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.projectStatus {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-top: 0.25rem;
+}
+
+.changeBtn {
+  flex-shrink: 0;
+  padding: 0.5rem 0.875rem;
+  background: white;
+  color: #2563eb;
+  font-weight: 500;
+  font-size: 0.8125rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.changeBtn:hover {
+  background: #eff6ff;
+}
+
+.selectBtn {
+  width: 100%;
+  padding: 0.875rem;
+  background: #2563eb;
+  color: white;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.selectBtn:hover {
+  background: #1d4ed8;
+}
+
+.startBtn {
+  width: 100%;
+  padding: 0.875rem;
+  background: #10b981;
+  color: white;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.startBtn:hover {
+  background: #059669;
+}
+
+.activitySection {
+  padding: 1.25rem;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.sectionTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.75rem;
+}
+
+.activityPlaceholder {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  text-align: center;
+  padding: 1rem 0;
+}
