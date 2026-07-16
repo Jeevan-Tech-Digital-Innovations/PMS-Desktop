@@ -25,6 +25,14 @@ let currentActiveWindowTitle = '';
 
 const SCREENSHOT_INTERVAL_MS = Number(process.env.SCREENSHOT_INTERVAL_MS) || 600_000; // 10 min
 
+/**
+ * Returns the main BrowserWindow instance.
+ * Used by background services to send IPC messages to the renderer.
+ */
+export function getMainWindow(): BrowserWindow | null {
+  return mainWindow;
+}
+
 // ── Window Creation ──────────────────────────────────────────────
 function createWindow(): void {
   // Remove default menu bar (File, Edit, View, Window, Help)

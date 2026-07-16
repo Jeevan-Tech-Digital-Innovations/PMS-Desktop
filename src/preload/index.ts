@@ -20,6 +20,9 @@ const IPC = {
   BREAK_STOP: 'break:stop',
   SCREENSHOT_CAPTURE: 'screenshot:capture',
   SCREENSHOT_UPLOADED: 'screenshot:uploaded',
+  URL_TRACKED: 'tracking:url',
+  ACTIVITY_UPDATED: 'tracking:activity',
+  HEARTBEAT_SYNCED: 'tracking:heartbeat',
   APP_QUIT: 'app:quit',
   APP_CHECK_UPDATES: 'app:check-updates',
   APP_MINIMIZE_TO_TRAY: 'app:minimize-to-tray',
@@ -73,6 +76,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const handler = (_: Electron.IpcRendererEvent, title: string) => callback(title);
     ipcRenderer.on(IPC.ACTIVE_WINDOW_INFO, handler);
     return () => ipcRenderer.removeListener(IPC.ACTIVE_WINDOW_INFO, handler);
+  },
+
+  // ── Tracking (URL / Activity / Heartbeat) ─────────────────────
+  onUrlTracked: (callback: (data: { url: string; title: string; timestamp: string }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, data: { url: string; title: string; timestamp: string }) =>
+      callback(data);
+    ipcRenderer.on(IPC.URL_TRACKED, handler);
+    return () => ipcRenderer.removeListener(IPC.URL_TRACKED, handler);
+  },
+  onActivityUpdated: (callback: (data: { keystrokes: number; mouseActions: number }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, data: { keystrokes: number; mouseActions: number }) =>
+      callback(data);
+    ipcRenderer.on(IPC.ACTIVITY_UPDATED, handler);
+    return () => ipcRenderer.removeListener(IPC.ACTIVITY_UPDATED, handler);
+  },
+  onHeartbeatSynced: (callback: (data: { timeLogId: number; elapsedMinutes: number; timestamp: string }) => void) => {
+    const handler = (
+      _: Electron.IpcRendererEvent,
+      data: { timeLogId: number; elapsedMinutes: number; timestamp: string },
+    ) => callback(data);
+    ipcRenderer.on(IPC.HEARTBEAT_SYNCED, handler);
+    return () => ipcRenderer.removeListener(IPC.HEARTBEAT_SYNCED, handler);
   },
 
   // ── App Lifecycle ─────────────────────────────────────────────

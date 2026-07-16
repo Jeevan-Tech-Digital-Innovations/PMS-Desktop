@@ -1,5 +1,7 @@
 import activeWindow from 'active-win';
 import { logger } from '../utils/logger';
+import { IPC } from '../utils/ipcChannels';
+import { getMainWindow } from '../index';
 
 const POLL_INTERVAL_MS = 10_000; // 10s
 
@@ -56,6 +58,8 @@ export function startUrlTracker(callback: (entry: UrlEntry) => void): void {
         };
         urlLog.push(entry);
         onUrlCallback?.(entry);
+        console.log(`[URL] Tracked: ${url} | Title: ${win.title}`);
+        getMainWindow()?.webContents.send(IPC.URL_TRACKED, entry);
         logger.debug(`URL tracked: ${url}`);
       }
     } catch (error) {

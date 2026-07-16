@@ -79,6 +79,53 @@ export default function App() {
     return () => unsubscribe?.();
   }, []);
 
+  useEffect(() => {
+    // Active window tracking
+    const unsubscribe = window.electronAPI?.onActiveWindowChange((title) => {
+      console.log('[Active Window] Changed:', {
+        title,
+        timestamp: new Date().toISOString(),
+      });
+    });
+    return () => unsubscribe?.();
+  }, []);
+
+  useEffect(() => {
+    // URL tracking
+    const unsubscribe = window.electronAPI?.onUrlTracked((data) => {
+      console.log('[URL] Tracked:', {
+        url: data.url,
+        title: data.title,
+        timestamp: data.timestamp,
+      });
+    });
+    return () => unsubscribe?.();
+  }, []);
+
+  useEffect(() => {
+    // Activity level monitoring
+    const unsubscribe = window.electronAPI?.onActivityUpdated((data) => {
+      console.log('[Activity] Updated:', {
+        keystrokes: data.keystrokes,
+        mouseActions: data.mouseActions,
+        timestamp: new Date().toISOString(),
+      });
+    });
+    return () => unsubscribe?.();
+  }, []);
+
+  useEffect(() => {
+    // Heartbeat syncing
+    const unsubscribe = window.electronAPI?.onHeartbeatSynced((data) => {
+      console.log('[Heartbeat] Synced:', {
+        timeLogId: data.timeLogId,
+        elapsedMinutes: data.elapsedMinutes,
+        timestamp: data.timestamp,
+      });
+    });
+    return () => unsubscribe?.();
+  }, []);
+
   return (
     <>
       <Toaster position="top-right" />

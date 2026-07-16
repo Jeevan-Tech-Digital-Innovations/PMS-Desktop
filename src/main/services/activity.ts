@@ -1,6 +1,8 @@
 import { uIOhook } from 'uiohook-napi';
 import { logger } from '../utils/logger';
 import { updateLastActivity } from './idle';
+import { IPC } from '../utils/ipcChannels';
+import { getMainWindow } from '../index';
 
 interface ActivityCounters {
   keystrokes: number;
@@ -9,6 +11,9 @@ interface ActivityCounters {
 
 let counters: ActivityCounters = { keystrokes: 0, mouseActions: 0 };
 let running = false;
+let broadcastHandle: ReturnType<typeof setInterval> | null = null;
+
+const BROADCAST_INTERVAL_MS = 60_000; // log every 60s
 
 /**
  * Starts counting keyboard and mouse events globally.
@@ -35,6 +40,14 @@ export function startActivityMonitor(): void {
   });
 
   uIOhook.start();
+
+  // Broadcast current activity counts every minute
+  broadcastHandle = setInterval(() => {
+    const snapshot = { ...counters };
+    console.log('[Activity] keystrokes:', snapshot.keystrokes, 'mouseActions:', snapshot.mouseActions);
+    getMainWindow()?.webContents.send(IPC.ACTIVITY_UPDATED, snapshot);
+  }, BROADCAST_INTERVAL_MS);
+
   logger.info('Activity monitor started');
 }
 
@@ -45,6 +58,10 @@ export function stopActivityMonitor(): void {
   if (!running) return;
   running = false;
   uIOhook.stop();
+  if (broadcastHandle) {
+    clearInterval(broadcastHandle);
+    broadcastHandle = null;
+  }
   counters = { keystrokes: 0, mouseActions: 0 };
   logger.info('Activity monitor stopped');
 }

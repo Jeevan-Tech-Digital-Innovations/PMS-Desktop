@@ -29,6 +29,11 @@ interface ElectronAPI {
   // Active window
   onActiveWindowChange: (callback: (title: string) => void) => () => void;
 
+  // Tracking (URL / Activity / Heartbeat)
+  onUrlTracked: (callback: (data: { url: string; title: string; timestamp: string }) => void) => () => void;
+  onActivityUpdated: (callback: (data: { keystrokes: number; mouseActions: number }) => void) => () => void;
+  onHeartbeatSynced: (callback: (data: { timeLogId: number; elapsedMinutes: number; timestamp: string }) => void) => () => void;
+
   // App lifecycle
   quitApp: () => void;
   checkForUpdates: () => Promise<{ updateAvailable: boolean }>;

@@ -27,6 +27,11 @@ export const IPC = {
   SCREENSHOT_CAPTURE: 'screenshot:capture',
   SCREENSHOT_UPLOADED: 'screenshot:uploaded',
 
+  // Tracking (URL, activity, heartbeat)
+  URL_TRACKED: 'tracking:url',
+  ACTIVITY_UPDATED: 'tracking:activity',
+  HEARTBEAT_SYNCED: 'tracking:heartbeat',
+
   // App lifecycle
   APP_QUIT: 'app:quit',
   APP_CHECK_UPDATES: 'app:check-updates',

@@ -1,5 +1,7 @@
 import { logger } from '../utils/logger';
 import { authStore } from '../utils/authStore';
+import { IPC } from '../utils/ipcChannels';
+import { getMainWindow } from '../index';
 
 const HEARTBEAT_INTERVAL_MS = Number(process.env.HEARTBEAT_INTERVAL_MS) || 300_000; // 5 min
 const API_BASE = process.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
@@ -66,6 +68,13 @@ async function syncHeartbeat(): Promise<void> {
 
   // Heartbeat endpoint not yet implemented in PMS API.
   // Logging locally so the elapsed time is still visible in logs.
+  const timestamp = new Date().toISOString();
+  console.log(`[Heartbeat] timeLogId=${timeLogId} elapsed=${elapsedMinutes}min`);
+  getMainWindow()?.webContents.send(IPC.HEARTBEAT_SYNCED, {
+    timeLogId,
+    elapsedMinutes,
+    timestamp,
+  });
   logger.debug(`Heartbeat (local only): ${elapsedMinutes}min elapsed for timeLogId ${timeLogId}`);
 
   /* ── Disabled: endpoint does not exist in PMS API ────────────────

@@ -1,5 +1,7 @@
 import activeWindow from 'active-win';
 import { logger } from '../utils/logger';
+import { IPC } from '../utils/ipcChannels';
+import { getMainWindow } from '../index';
 
 const POLL_INTERVAL_MS = Number(process.env.ACTIVE_WINDOW_POLL_MS) || 30_000; // 30s default
 
@@ -33,6 +35,8 @@ export function startActiveWindowPoll(callback: (title: string) => void): void {
     if (title !== lastWindowTitle) {
       lastWindowTitle = title;
       onWindowChangeCallback?.(title);
+      console.log(`[Active Window] ${title}`);
+      getMainWindow()?.webContents.send(IPC.ACTIVE_WINDOW_INFO, title);
       logger.debug(`Active window changed: ${title}`);
     }
   }, POLL_INTERVAL_MS);
