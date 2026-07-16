@@ -14,23 +14,24 @@ interface ElectronAPI {
   startTimer: (payload: { timeLogId: number; startTime: string }) => void;
   stopTimer: () => void;
 
-  // Idle
-  onIdleDetected: (callback: (data: { idleMs: number }) => void) => () => void;
-  respondToIdle: (action: 'keep' | 'discard') => void;
-
   // Break
   startBreak: () => void;
   stopBreak: () => void;
+
+  // Idle
+  onIdleStarted: (callback: (data: { seconds: number }) => void) => () => void;
+  onIdleStopped: (callback: () => void) => () => void;
 
   // Screenshots
   captureScreenshot: () => Promise<string | null>;
   onScreenshotUploaded: (callback: (data: { timeLogId: number }) => void) => () => void;
 
   // Active window
-  onActiveWindowChange: (callback: (title: string) => void) => () => void;
+  onActiveWindowChange: (
+    callback: (data: { app: string; task: string; rawTitle: string }) => void,
+  ) => () => void;
 
-  // Tracking (URL / Activity / Heartbeat)
-  onUrlTracked: (callback: (data: { url: string; title: string; timestamp: string }) => void) => () => void;
+  // Tracking (Activity / Heartbeat)
   onActivityUpdated: (callback: (data: { keystrokes: number; mouseActions: number }) => void) => () => void;
   onHeartbeatSynced: (callback: (data: { timeLogId: number; elapsedMinutes: number; timestamp: string }) => void) => () => void;
 

@@ -62,6 +62,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+.idleActive {
+  color: #f59e0b;
+}
+
 .projectCard {
   padding: 1rem 1.25rem;
   background: white;

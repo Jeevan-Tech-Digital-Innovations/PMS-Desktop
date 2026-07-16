@@ -15,9 +15,10 @@ export function TimeTracking() {
   const {
     isRunning,
     workSeconds,
+    idleSeconds,
     breakSeconds,
     isOnBreak,
-    isIdlePaused,
+    isIdle,
     startTimer,
     stopTimer,
     tick,
@@ -116,15 +117,21 @@ export function TimeTracking() {
     <div className={styles.container}>
       <div className={styles.connectionStatus}>
         <span className={styles.statusDot} />
-        {isIdlePaused ? 'Idle — timer paused' : 'Connected'}
+        Connected
       </div>
 
       <div className={styles.timerSection}>
-        <div className={styles.timer}>{formatTime(workSeconds)}</div>
+        <div className={styles.timer}>{formatTime(workSeconds + idleSeconds)}</div>
         <div className={styles.counters}>
           <div className={styles.counter}>
             <span className={styles.counterLabel}>Work</span>
-            <span className={styles.counterValue}>{formatTime(workSeconds)}</span>
+            <span className={styles.counterValue}>{formatTime(workSeconds + idleSeconds)}</span>
+          </div>
+          <div className={styles.counter}>
+            <span className={styles.counterLabel}>Idle</span>
+            <span className={`${styles.counterValue} ${isIdle ? styles.idleActive : ''}`}>
+              {formatTime(idleSeconds)}
+            </span>
           </div>
           <div className={styles.counter}>
             <span className={styles.counterLabel}>Break</span>

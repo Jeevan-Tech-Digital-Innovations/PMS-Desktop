@@ -15,20 +15,19 @@ export const IPC = {
   TIMER_STOP: 'timer:stop',
   TIMER_TICK: 'timer:tick',
 
-  // Idle
-  IDLE_DETECTED: 'idle:detected',
-  IDLE_RESPONSE: 'idle:response',
-
   // Break
   BREAK_START: 'break:start',
   BREAK_STOP: 'break:stop',
+
+  // Idle
+  IDLE_STARTED: 'idle:started',
+  IDLE_STOPPED: 'idle:stopped',
 
   // Screenshots
   SCREENSHOT_CAPTURE: 'screenshot:capture',
   SCREENSHOT_UPLOADED: 'screenshot:uploaded',
 
-  // Tracking (URL, activity, heartbeat)
-  URL_TRACKED: 'tracking:url',
+  // Tracking (activity, heartbeat)
   ACTIVITY_UPDATED: 'tracking:activity',
   HEARTBEAT_SYNCED: 'tracking:heartbeat',
 

@@ -12,9 +12,13 @@ import {
   getActivityPercentages,
   resetActivityCounters,
 } from './services/activity';
-import { startIdleDetection, stopIdleDetection } from './services/idle';
+import {
+  startIdleMonitor,
+  stopIdleMonitor,
+  pauseIdleMonitor,
+  resumeIdleMonitor,
+} from './services/idle';
 import { startActiveWindowPoll, stopActiveWindowPoll, getActiveWindowTitle } from './services/activeWindow';
-import { startUrlTracker, stopUrlTracker } from './services/urlTracker';
 import { startHeartbeat, stopHeartbeat, flushHeartbeat } from './services/heartbeat';
 import { captureScreenshot, cleanupTempScreenshots } from './services/screenshot';
 import { uploadScreenshot } from './services/uploader';
@@ -89,32 +93,23 @@ function startAllBackgroundServices(timeLogId: number, startTime: string): void 
   // Activity monitor
   startActivityMonitor();
 
-  // Active window tracking
-  startActiveWindowPoll((title) => {
-    currentActiveWindowTitle = title;
-    mainWindow?.webContents.send(IPC.ACTIVE_WINDOW_INFO, title);
-  });
-
-  // URL tracking
-  startUrlTracker(() => {
-    // URL entries are collected silently
-  });
-
   // Idle detection
-  startIdleDetection(
-    (idleMs) => {
-      console.log(`[Idle] User idle detected: ${idleMs}ms (${Math.round(idleMs / 1000)}s)`);
-      mainWindow?.webContents.send(IPC.IDLE_DETECTED, { idleMs });
-    },
-    (idleMs) => {
-      console.log(`[Idle] User resumed after ${idleMs}ms idle`);
-    },
-  );
+  startIdleMonitor();
+
+  // Active window tracking
+  startActiveWindowPoll((info) => {
+    currentActiveWindowTitle = info.rawTitle;
+    mainWindow?.webContents.send(IPC.ACTIVE_WINDOW_INFO, info);
+  });
 
   // Heartbeat sync
   startHeartbeat(timeLogId, startTime);
 
   // Screenshot loop
+  if (screenshotInterval) {
+    clearInterval(screenshotInterval);
+    screenshotInterval = null;
+  }
   screenshotInterval = setInterval(async () => {
     await captureAndUploadScreenshot(timeLogId);
   }, SCREENSHOT_INTERVAL_MS);
@@ -123,10 +118,10 @@ function startAllBackgroundServices(timeLogId: number, startTime: string): void 
 }
 
 function stopAllBackgroundServices(): void {
+  console.log('[Background] Stopping all background services');
   stopActivityMonitor();
+  stopIdleMonitor();
   stopActiveWindowPoll();
-  stopUrlTracker();
-  stopIdleDetection();
   stopHeartbeat();
 
   if (screenshotInterval) {
@@ -135,6 +130,7 @@ function stopAllBackgroundServices(): void {
   }
 
   logger.info('All background services stopped');
+  console.log('[Background] All background services stopped');
 }
 
 async function captureAndUploadScreenshot(timeLogId: number): Promise<void> {
@@ -179,13 +175,13 @@ function registerIpcHandlers(): void {
   });
 
   // Break
-  ipcMain.on(IPC.BREAK_START, () => pauseActivityMonitor());
-  ipcMain.on(IPC.BREAK_STOP, () => resumeActivityMonitor());
-
-  // Idle response
-  ipcMain.on(IPC.IDLE_RESPONSE, (_, response: { action: 'keep' | 'discard' }) => {
-    // Renderer handles the API call; main just acknowledges
-    logger.info(`Idle response: ${response.action}`);
+  ipcMain.on(IPC.BREAK_START, () => {
+    pauseActivityMonitor();
+    pauseIdleMonitor();
+  });
+  ipcMain.on(IPC.BREAK_STOP, () => {
+    resumeActivityMonitor();
+    resumeIdleMonitor();
   });
 
   // Screenshot manual capture

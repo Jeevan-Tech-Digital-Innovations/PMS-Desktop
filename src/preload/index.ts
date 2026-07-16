@@ -14,13 +14,12 @@ const IPC = {
   TIMER_START: 'timer:start',
   TIMER_STOP: 'timer:stop',
   TIMER_TICK: 'timer:tick',
-  IDLE_DETECTED: 'idle:detected',
-  IDLE_RESPONSE: 'idle:response',
   BREAK_START: 'break:start',
   BREAK_STOP: 'break:stop',
+  IDLE_STARTED: 'idle:started',
+  IDLE_STOPPED: 'idle:stopped',
   SCREENSHOT_CAPTURE: 'screenshot:capture',
   SCREENSHOT_UPLOADED: 'screenshot:uploaded',
-  URL_TRACKED: 'tracking:url',
   ACTIVITY_UPDATED: 'tracking:activity',
   HEARTBEAT_SYNCED: 'tracking:heartbeat',
   APP_QUIT: 'app:quit',
@@ -50,18 +49,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send(IPC.TIMER_START, payload),
   stopTimer: () => ipcRenderer.send(IPC.TIMER_STOP),
 
-  // ── Idle ──────────────────────────────────────────────────────
-  onIdleDetected: (callback: (data: { idleMs: number }) => void) => {
-    const handler = (_: Electron.IpcRendererEvent, data: { idleMs: number }) => callback(data);
-    ipcRenderer.on(IPC.IDLE_DETECTED, handler);
-    return () => ipcRenderer.removeListener(IPC.IDLE_DETECTED, handler);
-  },
-  respondToIdle: (action: 'keep' | 'discard') =>
-    ipcRenderer.send(IPC.IDLE_RESPONSE, { action }),
-
   // ── Break ─────────────────────────────────────────────────────
   startBreak: () => ipcRenderer.send(IPC.BREAK_START),
   stopBreak: () => ipcRenderer.send(IPC.BREAK_STOP),
+
+  // ── Idle ──────────────────────────────────────────────────────
+  onIdleStarted: (callback: (data: { seconds: number }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, data: { seconds: number }) => callback(data);
+    ipcRenderer.on(IPC.IDLE_STARTED, handler);
+    return () => ipcRenderer.removeListener(IPC.IDLE_STARTED, handler);
+  },
+  onIdleStopped: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on(IPC.IDLE_STOPPED, handler);
+    return () => ipcRenderer.removeListener(IPC.IDLE_STOPPED, handler);
+  },
 
   // ── Screenshots ───────────────────────────────────────────────
   captureScreenshot: () => ipcRenderer.invoke(IPC.SCREENSHOT_CAPTURE),
@@ -72,19 +74,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // ── Active Window ─────────────────────────────────────────────
-  onActiveWindowChange: (callback: (title: string) => void) => {
-    const handler = (_: Electron.IpcRendererEvent, title: string) => callback(title);
+  onActiveWindowChange: (callback: (data: { app: string; task: string; rawTitle: string }) => void) => {
+    const handler = (
+      _: Electron.IpcRendererEvent,
+      data: { app: string; task: string; rawTitle: string },
+    ) => callback(data);
     ipcRenderer.on(IPC.ACTIVE_WINDOW_INFO, handler);
     return () => ipcRenderer.removeListener(IPC.ACTIVE_WINDOW_INFO, handler);
   },
 
-  // ── Tracking (URL / Activity / Heartbeat) ─────────────────────
-  onUrlTracked: (callback: (data: { url: string; title: string; timestamp: string }) => void) => {
-    const handler = (_: Electron.IpcRendererEvent, data: { url: string; title: string; timestamp: string }) =>
-      callback(data);
-    ipcRenderer.on(IPC.URL_TRACKED, handler);
-    return () => ipcRenderer.removeListener(IPC.URL_TRACKED, handler);
-  },
+  // ── Tracking (Activity / Heartbeat) ───────────────────────────
   onActivityUpdated: (callback: (data: { keystrokes: number; mouseActions: number }) => void) => {
     const handler = (_: Electron.IpcRendererEvent, data: { keystrokes: number; mouseActions: number }) =>
       callback(data);

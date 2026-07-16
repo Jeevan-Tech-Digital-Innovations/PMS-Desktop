@@ -88,7 +88,6 @@ periodic screenshots, and backend synchronization. Built with Electron + React.
 | Activity Monitoring     | uiohook-napi (keystroke/mouse counts)          |
 | Idle Detection          | desktop-idle (poll OS idle time)               |
 | Active Window Tracking  | active-win (poll every N seconds)              |
-| URL Tracking            | Electron webContents / OS-level process list   |
 | Auto-Update             | electron-updater                               |
 | Heartbeat Sync          | setInterval + Axios (every 5 min)              |
 

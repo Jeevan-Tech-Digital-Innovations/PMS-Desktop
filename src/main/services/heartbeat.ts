@@ -21,6 +21,9 @@ interface HeartbeatPayload {
  * Pings every N minutes to persist current time progress.
  */
 export function startHeartbeat(logId: number, start: string): void {
+  // Ensure any previous heartbeat is fully cleared before starting a new one
+  stopHeartbeat();
+
   timeLogId = logId;
   startTime = start;
 
@@ -28,6 +31,7 @@ export function startHeartbeat(logId: number, start: string): void {
     await syncHeartbeat();
   }, HEARTBEAT_INTERVAL_MS);
 
+  console.log(`[Heartbeat] Started for timeLogId: ${logId}`);
   logger.info(`Heartbeat started for timeLogId: ${logId}`);
 }
 

@@ -3,8 +3,6 @@ import { Toaster } from 'react-hot-toast';
 import { useEffect } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { useTimerStore } from '@/stores/timerStore';
-import { useUiStore } from '@/stores/uiStore';
-import { IdleModal } from '@/components/IdleModal/IdleModal';
 
 // Page imports
 import { Login } from '@/pages/Login';
@@ -18,10 +16,20 @@ import { Settings } from '@/pages/Settings';
 import { AuthLayout } from '@/layout/AuthLayout/AuthLayout';
 import { AppLayout } from '@/layout/AppLayout/AppLayout';
 
-// Auth guard
+// Auth guards
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  if (isLoading) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+function PublicRoute({ children }: { children: React.ReactNode }) {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  if (isLoading) return null;
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
@@ -52,23 +60,6 @@ export default function App() {
   }, [navigate]);
 
   useEffect(() => {
-    // Global idle detection: pause timer and show modal regardless of current page
-    const unsubscribe = window.electronAPI?.onIdleDetected((data) => {
-      console.log('[Idle] User idle detected:', {
-        idleMs: data.idleMs,
-        idleSeconds: Math.round(data.idleMs / 1000),
-        timestamp: new Date().toISOString(),
-      });
-      const { isRunning, isIdlePaused } = useTimerStore.getState();
-      if (isRunning && !isIdlePaused) {
-        useTimerStore.getState().pauseForIdle();
-        useUiStore.getState().openIdleModal(data.idleMs);
-      }
-    });
-    return () => unsubscribe?.();
-  }, []);
-
-  useEffect(() => {
     // Screenshot capture notifications
     const unsubscribe = window.electronAPI?.onScreenshotUploaded((data) => {
       console.log('[Screenshot] Captured and saved:', {
@@ -81,9 +72,16 @@ export default function App() {
 
   useEffect(() => {
     // Active window tracking
-    const unsubscribe = window.electronAPI?.onActiveWindowChange((title) => {
+    const unsubscribe = window.electronAPI?.onActiveWindowChange((data) => {
+      // Defensive: old preload sends a string; new preload sends { app, task, rawTitle }
+      const info =
+        typeof data === 'string'
+          ? { window: data, task: '', rawTitle: data }
+          : { window: data?.app, task: data?.task, rawTitle: data?.rawTitle };
       console.log('[Active Window] Changed:', {
-        title,
+        window: info.window,
+        task: info.task,
+        rawTitle: info.rawTitle,
         timestamp: new Date().toISOString(),
       });
     });
@@ -91,20 +89,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // URL tracking
-    const unsubscribe = window.electronAPI?.onUrlTracked((data) => {
-      console.log('[URL] Tracked:', {
-        url: data.url,
-        title: data.title,
-        timestamp: data.timestamp,
-      });
-    });
-    return () => unsubscribe?.();
-  }, []);
-
-  useEffect(() => {
     // Activity level monitoring
-    const unsubscribe = window.electronAPI?.onActivityUpdated((data) => {
+    if (typeof window.electronAPI?.onActivityUpdated !== 'function') return;
+    const unsubscribe = window.electronAPI.onActivityUpdated((data) => {
       console.log('[Activity] Updated:', {
         keystrokes: data.keystrokes,
         mouseActions: data.mouseActions,
@@ -116,7 +103,8 @@ export default function App() {
 
   useEffect(() => {
     // Heartbeat syncing
-    const unsubscribe = window.electronAPI?.onHeartbeatSynced((data) => {
+    if (typeof window.electronAPI?.onHeartbeatSynced !== 'function') return;
+    const unsubscribe = window.electronAPI.onHeartbeatSynced((data) => {
       console.log('[Heartbeat] Synced:', {
         timeLogId: data.timeLogId,
         elapsedMinutes: data.elapsedMinutes,
@@ -126,13 +114,35 @@ export default function App() {
     return () => unsubscribe?.();
   }, []);
 
+  useEffect(() => {
+    // Idle state changes from the main process activity monitor
+    if (typeof window.electronAPI?.onIdleStarted !== 'function') return;
+    const unsubscribeStart = window.electronAPI.onIdleStarted((data) => {
+      console.log('[Idle] Started');
+      useTimerStore.getState().startIdle(data.seconds);
+    });
+    const unsubscribeStop = window.electronAPI.onIdleStopped(() => {
+      console.log('[Idle] Stopped');
+      useTimerStore.getState().stopIdle();
+    });
+    return () => {
+      unsubscribeStart?.();
+      unsubscribeStop?.();
+    };
+  }, []);
+
   return (
     <>
       <Toaster position="top-right" />
-      <IdleModal />
       <Routes>
         {/* Public routes */}
-        <Route element={<AuthLayout />}>
+        <Route
+          element={
+            <PublicRoute>
+              <AuthLayout />
+            </PublicRoute>
+          }
+        >
           <Route path="/login" element={<Login />} />
         </Route>
 
@@ -152,7 +162,7 @@ export default function App() {
         </Route>
 
         {/* Default redirect */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </>
   );

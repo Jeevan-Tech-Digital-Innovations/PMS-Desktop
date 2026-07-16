@@ -10,7 +10,6 @@
 │  │  (system     │ │  Service      │ │  - Activity Monitor    │  │
 │  │   tray icon) │ │  (10min loop) │ │  - Idle Detector       │  │
 │  └──────┬───────┘ └──────┬────────┘ │  - Active Window Track │  │
-│         │                │          │  - URL Tracker         │  │
 │  ┌──────┴───────┐ ┌──────┴────────┐ │  - Heartbeat Sync     │  │
 │  │  Auth Store  │ │  Upload Queue │ └──────────┬─────────────┘  │
 │  │  (electron-  │ │  (screenshots │            │                │
@@ -235,7 +234,6 @@ pms_desktop/
 │   │   │   ├── activity.ts           ← Keystroke/mouse event counting
 │   │   │   ├── idle.ts              ← Idle time detection
 │   │   │   ├── activeWindow.ts       ← Active window title polling
-│   │   │   ├── urlTracker.ts         ← Website URL tracking
 │   │   │   ├── heartbeat.ts          ← 5-min backend sync ping
 │   │   │   └── uploader.ts           ← Multipart screenshot upload queue
 │   │   │
@@ -557,6 +555,6 @@ Before a page is considered complete, it must have:
 | 8     | Screenshot capture + upload            | 2 days           |
 | 9     | Activity monitoring (keys/mouse)       | 2 days           |
 | 10    | Idle detection + modal                 | 2 days           |
-| 11    | Active window + URL tracking           | 2 days           |
+| 11    | Active window tracking                 | 2 days           |
 | 12    | Profile menu, settings, auto-update    | 2 days           |
 | 13    | Packaging & distribution               | 2 days           |

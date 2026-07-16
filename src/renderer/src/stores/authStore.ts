@@ -47,7 +47,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     useTimerStore.getState().stopTimer();
     useTimerStore.getState().reset();
     useProjectStore.getState().clearSelection();
-    useUiStore.getState().closeIdleModal();
     useUiStore.getState().closeBreakModal();
     useUiStore.getState().closeNoteModal();
     // Stop Electron background services (screenshots, idle, heartbeat)

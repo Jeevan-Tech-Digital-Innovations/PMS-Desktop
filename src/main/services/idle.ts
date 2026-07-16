@@ -1,83 +1,76 @@
+import { IPC } from '../utils/ipcChannels';
 import { logger } from '../utils/logger';
+import { getMainWindow } from '../index';
+import { getIdleTimeMs, resetLastActivity } from './activity';
 
-/**
- * Idle detection based on uiohook activity.
- * Tracks the last input event time and checks if idle threshold is crossed.
- * This avoids the native desktop-idle dependency which requires C++ build tools.
- */
+const IDLE_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
+const IDLE_THRESHOLD_SECONDS = Math.round(IDLE_THRESHOLD_MS / 1000);
+const POLL_INTERVAL_MS = 1000;
 
-const IDLE_THRESHOLD_MS = Number(process.env.IDLE_THRESHOLD_MS) || 300_000; // 5 min default
-const POLL_INTERVAL_MS = 10_000; // check every 10 sec
+let running = false;
+let idle = false;
+let pollHandle: ReturnType<typeof setInterval> | null = null;
 
-let idlePollingHandle: ReturnType<typeof setInterval> | null = null;
-let idleNotified = false;
-let idleStartTime: number | null = null;
-let onIdleCallback: ((idleMs: number) => void) | null = null;
-let onResumeCallback: ((idleMs: number) => void) | null = null;
-let lastActivityTime: number = Date.now();
-
-/**
- * Updates the last activity timestamp.
- * Should be called from the activity monitor on every key/mouse event.
- */
-export function updateLastActivity(): void {
-  lastActivityTime = Date.now();
+function broadcast(channel: string, data?: unknown): void {
+  const mainWindow = getMainWindow();
+  if (!mainWindow) return;
+  mainWindow.webContents.send(channel, data);
 }
 
-/**
- * Returns current idle time in milliseconds (time since last input event).
- */
-export function getCurrentIdleTime(): number {
-  return Date.now() - lastActivityTime;
-}
+function tick(): void {
+  if (!running) return;
 
-/**
- * Starts polling for idle time.
- * @param onIdle - Called once when idle threshold is crossed
- * @param onResume - Called when user returns from idle
- */
-export function startIdleDetection(
-  onIdle: (idleMs: number) => void,
-  onResume: (idleMs: number) => void,
-): void {
-  onIdleCallback = onIdle;
-  onResumeCallback = onResume;
-  idleNotified = false;
-  idleStartTime = null;
-  lastActivityTime = Date.now();
+  const idleMs = getIdleTimeMs();
 
-  idlePollingHandle = setInterval(() => {
-    const idleMs = getCurrentIdleTime();
-
-    if (idleMs >= IDLE_THRESHOLD_MS && !idleNotified) {
-      idleNotified = true;
-      idleStartTime = Date.now() - idleMs;
-      logger.info(`Idle threshold crossed: ${idleMs}ms`);
-      onIdleCallback?.(idleMs);
-    } else if (idleMs < IDLE_THRESHOLD_MS && idleNotified) {
-      // User returned
-      const totalIdleMs = idleStartTime ? Date.now() - idleStartTime : idleMs;
-      idleNotified = false;
-      idleStartTime = null;
-      logger.info(`User returned from idle: ${totalIdleMs}ms`);
-      onResumeCallback?.(totalIdleMs);
-    }
-  }, POLL_INTERVAL_MS);
-
-  logger.info('Idle detection started');
-}
-
-/**
- * Stops polling for idle time.
- */
-export function stopIdleDetection(): void {
-  if (idlePollingHandle) {
-    clearInterval(idlePollingHandle);
-    idlePollingHandle = null;
+  if (!idle && idleMs >= IDLE_THRESHOLD_MS) {
+    idle = true;
+    logger.info(`Idle threshold crossed after ${Math.round(idleMs / 1000)}s`);
+    console.log(`[Idle] Started after ${Math.round(idleMs / 1000)}s of inactivity`);
+    broadcast(IPC.IDLE_STARTED, { seconds: IDLE_THRESHOLD_SECONDS });
+    return;
   }
-  idleNotified = false;
-  idleStartTime = null;
-  onIdleCallback = null;
-  onResumeCallback = null;
-  logger.info('Idle detection stopped');
+
+  if (idle && idleMs < IDLE_THRESHOLD_MS) {
+    idle = false;
+    logger.info('Activity resumed; idle period ended');
+    console.log('[Idle] Stopped – activity detected');
+    broadcast(IPC.IDLE_STOPPED);
+  }
+}
+
+export function startIdleMonitor(): void {
+  if (running) return;
+  running = true;
+  idle = false;
+  pollHandle = setInterval(tick, POLL_INTERVAL_MS);
+  logger.info('Idle monitor started');
+  console.log('[Idle] Monitor started');
+}
+
+export function stopIdleMonitor(): void {
+  if (!running && !idle) return;
+  running = false;
+  idle = false;
+  if (pollHandle) {
+    clearInterval(pollHandle);
+    pollHandle = null;
+  }
+  logger.info('Idle monitor stopped');
+  console.log('[Idle] Monitor stopped');
+}
+
+export function pauseIdleMonitor(): void {
+  if (!running) return;
+  running = false;
+  logger.info('Idle monitor paused (break)');
+  console.log('[Idle] Monitor paused (break)');
+}
+
+export function resumeIdleMonitor(): void {
+  if (running) return;
+  // Reset activity baseline so the post-break period does not instantly trigger idle.
+  resetLastActivity();
+  running = true;
+  logger.info('Idle monitor resumed');
+  console.log('[Idle] Monitor resumed');
 }

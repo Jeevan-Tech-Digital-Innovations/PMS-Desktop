@@ -3,29 +3,30 @@ import { create } from 'zustand';
 interface TimerState {
   isRunning: boolean;
   isOnBreak: boolean;
-  isIdlePaused: boolean;
+  isIdle: boolean;
   workSeconds: number;
+  idleSeconds: number;
   breakSeconds: number;
   startTime: string | null;
 
   // Actions
   startTimer: () => void;
   stopTimer: () => void;
-  pauseForIdle: () => void;
-  resumeFromIdle: () => void;
   tick: () => void;
+  startIdle: (offsetSeconds: number) => void;
+  stopIdle: () => void;
   startBreak: () => void;
   stopBreak: () => void;
   tickBreak: () => void;
-  subtractWorkTime: (seconds: number) => void;
   reset: () => void;
 }
 
 export const useTimerStore = create<TimerState>((set, get) => ({
   isRunning: false,
   isOnBreak: false,
-  isIdlePaused: false,
+  isIdle: false,
   workSeconds: 0,
+  idleSeconds: 0,
   breakSeconds: 0,
   startTime: null,
 
@@ -33,8 +34,9 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     set({
       isRunning: true,
       isOnBreak: false,
-      isIdlePaused: false,
+      isIdle: false,
       workSeconds: 0,
+      idleSeconds: 0,
       breakSeconds: 0,
       startTime: new Date().toISOString(),
     }),
@@ -43,27 +45,26 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     set({
       isRunning: false,
       isOnBreak: false,
-      isIdlePaused: false,
-    }),
-
-  pauseForIdle: () =>
-    set({
-      isRunning: false,
-      isIdlePaused: true,
-    }),
-
-  resumeFromIdle: () =>
-    set({
-      isRunning: true,
-      isIdlePaused: false,
+      isIdle: false,
     }),
 
   tick: () => {
-    const { isRunning, isOnBreak } = get();
-    if (isRunning && !isOnBreak) {
+    const { isRunning, isOnBreak, isIdle } = get();
+    if (!isRunning || isOnBreak) return;
+    if (isIdle) {
+      set((state) => ({ idleSeconds: state.idleSeconds + 1 }));
+    } else {
       set((state) => ({ workSeconds: state.workSeconds + 1 }));
     }
   },
+
+  startIdle: (offsetSeconds) =>
+    set((state) => ({
+      isIdle: true,
+      idleSeconds: state.idleSeconds + offsetSeconds,
+    })),
+
+  stopIdle: () => set({ isIdle: false }),
 
   startBreak: () =>
     set({
@@ -83,17 +84,13 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     }
   },
 
-  subtractWorkTime: (seconds: number) =>
-    set((state) => ({
-      workSeconds: Math.max(0, state.workSeconds - seconds),
-    })),
-
   reset: () =>
     set({
       isRunning: false,
       isOnBreak: false,
-      isIdlePaused: false,
+      isIdle: false,
       workSeconds: 0,
+      idleSeconds: 0,
       breakSeconds: 0,
       startTime: null,
     }),

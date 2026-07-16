@@ -1,6 +1,5 @@
 import { uIOhook } from 'uiohook-napi';
 import { logger } from '../utils/logger';
-import { updateLastActivity } from './idle';
 import { IPC } from '../utils/ipcChannels';
 import { getMainWindow } from '../index';
 
@@ -12,6 +11,11 @@ interface ActivityCounters {
 let counters: ActivityCounters = { keystrokes: 0, mouseActions: 0 };
 let running = false;
 let broadcastHandle: ReturnType<typeof setInterval> | null = null;
+let lastActivityAt = Date.now();
+
+function bumpActivity(): void {
+  lastActivityAt = Date.now();
+}
 
 const BROADCAST_INTERVAL_MS = 60_000; // log every 60s
 
@@ -23,20 +27,25 @@ export function startActivityMonitor(): void {
   if (running) return;
   running = true;
   counters = { keystrokes: 0, mouseActions: 0 };
+  lastActivityAt = Date.now();
 
   uIOhook.on('keydown', () => {
     counters.keystrokes++;
-    updateLastActivity();
+    bumpActivity();
   });
 
   uIOhook.on('mousedown', () => {
     counters.mouseActions++;
-    updateLastActivity();
+    bumpActivity();
+  });
+
+  uIOhook.on('mousemove', () => {
+    bumpActivity();
   });
 
   uIOhook.on('wheel', () => {
     counters.mouseActions++;
-    updateLastActivity();
+    bumpActivity();
   });
 
   uIOhook.start();
@@ -103,4 +112,17 @@ export function getActivityPercentages(): { keyboardActivity: number; mouseActiv
  */
 export function resetActivityCounters(): void {
   counters = { keystrokes: 0, mouseActions: 0 };
+}
+
+export function getIdleTimeMs(): number {
+  if (!running) return 0;
+  return Date.now() - lastActivityAt;
+}
+
+export function resetLastActivity(): void {
+  lastActivityAt = Date.now();
+}
+
+export function isActivityMonitorRunning(): boolean {
+  return running;
 }

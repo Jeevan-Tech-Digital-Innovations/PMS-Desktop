@@ -8,7 +8,7 @@ import styles from './Dashboard.module.css';
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const { isRunning, workSeconds, breakSeconds, isIdlePaused, tick, tickBreak } = useTimerStore();
+  const { isRunning, workSeconds, idleSeconds, breakSeconds, isIdle, tick, tickBreak } = useTimerStore();
   const selectedProject = useProjectStore((s) => s.selectedProject);
   const selectedTask = useProjectStore((s) => s.selectedTask);
   const startMutation = useStartTimeLog();
@@ -22,15 +22,15 @@ export function Dashboard() {
   }, [tick, tickBreak]);
 
   const getStatusText = () => {
-    if (isIdlePaused) return 'Idle — Paused';
-    if (isRunning) return 'Working';
-    return 'Ready';
+    if (!isRunning) return 'Ready';
+    if (isIdle) return 'Idle';
+    return 'Working';
   };
 
   const getStatusClass = () => {
-    if (isIdlePaused) return styles.statusPaused;
-    if (isRunning) return styles.statusWorking;
-    return styles.statusReady;
+    if (!isRunning) return styles.statusReady;
+    if (isIdle) return styles.statusIdle;
+    return styles.statusWorking;
   };
 
   return (
@@ -43,11 +43,17 @@ export function Dashboard() {
       </div>
 
       <div className={styles.timerSection}>
-        <div className={styles.timer}>{formatTime(workSeconds)}</div>
+        <div className={styles.timer}>{formatTime(workSeconds + idleSeconds)}</div>
         <div className={styles.counters}>
           <div className={styles.counter}>
             <span className={styles.counterLabel}>Work Time</span>
-            <span className={styles.counterValue}>{formatTime(workSeconds)}</span>
+            <span className={styles.counterValue}>{formatTime(workSeconds + idleSeconds)}</span>
+          </div>
+          <div className={styles.counter}>
+            <span className={styles.counterLabel}>Idle Time</span>
+            <span className={`${styles.counterValue} ${isIdle ? styles.idleActive : ''}`}>
+              {formatTime(idleSeconds)}
+            </span>
           </div>
           <div className={styles.counter}>
             <span className={styles.counterLabel}>Break Time</span>
