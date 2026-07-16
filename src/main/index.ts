@@ -161,7 +161,7 @@ async function captureAndUploadScreenshot(timeLogId: number): Promise<void> {
 // ── IPC Handlers ─────────────────────────────────────────────────
 function registerIpcHandlers(): void {
   // Auth
-  ipcMain.handle(IPC.AUTH_GET_TOKENS, () => authStore.getTokens());
+  ipcMain.handle(IPC.AUTH_GET_TOKENS, () => authStore.getStartupTokens());
   ipcMain.handle(IPC.AUTH_SAVE_TOKENS, (_, data) => authStore.saveTokens(data));
   ipcMain.handle(IPC.AUTH_CLEAR_TOKENS, () => authStore.clearTokens());
   ipcMain.handle(IPC.AUTH_GET_USER, () => authStore.getUser());

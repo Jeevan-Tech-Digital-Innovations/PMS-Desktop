@@ -15,12 +15,6 @@ interface UploadPayload {
 
 /**
  * Uploads a screenshot to the backend via multipart/form-data POST.
- *
- * NOTE: The PMS API does not currently provide a screenshot upload endpoint.
- * (POST /time-logs/{id}/screenshots does not exist in the backend.)
- * Screenshots are still captured and kept locally, but the upload is skipped
- * to avoid 404 errors.
- * Once the backend adds a screenshot upload endpoint, re-enable the fetch below.
  */
 export async function uploadScreenshot(payload: UploadPayload): Promise<boolean> {
   const { accessToken } = authStore.getTokens();
@@ -29,12 +23,8 @@ export async function uploadScreenshot(payload: UploadPayload): Promise<boolean>
     return false;
   }
 
-  logger.info(
-    `Screenshot captured locally (upload skipped — endpoint not yet implemented in PMS API): ` +
-      `${payload.filepath} for timeLogId=${payload.timeLogId}`,
-  );
+  logger.info(`Uploading screenshot for timeLogId=${payload.timeLogId}`);
 
-  /* ── Disabled: endpoint does not exist in PMS API ────────────────
   try {
     const fileBuffer = fs.readFileSync(payload.filepath);
     const filename = payload.filepath.split(/[\\/]/).pop() || 'screenshot.png';
@@ -78,7 +68,5 @@ export async function uploadScreenshot(payload: UploadPayload): Promise<boolean>
     logger.error('Screenshot upload error', error);
     return false;
   }
-  ──────────────────────────────────────────────────────────────── */
-
-  return true;
 }
+

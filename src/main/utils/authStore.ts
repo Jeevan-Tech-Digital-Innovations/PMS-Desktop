@@ -26,13 +26,17 @@ const store = new Store<AuthSchema>({
 
 export const authStore = {
   getTokens() {
-    if (!store.get('rememberMe')) {
-      return { accessToken: null, refreshToken: null };
-    }
     return {
       accessToken: store.get('accessToken'),
       refreshToken: store.get('refreshToken'),
     };
+  },
+
+  getStartupTokens() {
+    if (!store.get('rememberMe')) {
+      return { accessToken: null, refreshToken: null };
+    }
+    return this.getTokens();
   },
 
   saveTokens(data: { accessToken: string; refreshToken: string; rememberMe: boolean }) {
