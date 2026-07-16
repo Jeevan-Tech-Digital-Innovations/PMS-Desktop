@@ -47,7 +47,7 @@ export function TimeTracking() {
   }, [tick, tickBreak]);
 
   const stopMutation = useMutation({
-    mutationFn: () => stopTimeLog(activeTimeLog!.id),
+    mutationFn: () => stopTimeLog(activeTimeLog!.taskId),
     onSuccess: () => {
       stopTimer();
       setActiveTimeLog(null);
@@ -62,7 +62,7 @@ export function TimeTracking() {
 
   const handleStart = () => {
     if (!selectedProject || !selectedTask) return;
-    startMutation.mutate({ projectId: selectedProject.id, taskId: selectedTask.id });
+    startMutation.mutate({ taskId: selectedTask.id });
   };
 
   const handleStop = () => {

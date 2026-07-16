@@ -44,6 +44,12 @@ export function stopHeartbeat(): void {
 
 /**
  * Sends a single heartbeat ping to the backend.
+ *
+ * NOTE: The PMS API does not currently provide a heartbeat endpoint.
+ * (PUT /tasks/time-logs/{id}/heartbeat does not exist in the backend.)
+ * The heartbeat timer still runs so that elapsed time is tracked locally,
+ * but the network call is skipped to avoid 404 errors.
+ * Once the backend adds a heartbeat endpoint, re-enable the fetch below.
  */
 async function syncHeartbeat(): Promise<void> {
   if (!timeLogId || !startTime) return;
@@ -58,6 +64,11 @@ async function syncHeartbeat(): Promise<void> {
     (Date.now() - new Date(startTime).getTime()) / 60_000,
   );
 
+  // Heartbeat endpoint not yet implemented in PMS API.
+  // Logging locally so the elapsed time is still visible in logs.
+  logger.debug(`Heartbeat (local only): ${elapsedMinutes}min elapsed for timeLogId ${timeLogId}`);
+
+  /* ── Disabled: endpoint does not exist in PMS API ────────────────
   const payload: HeartbeatPayload = {
     timeLogId,
     startTime,
@@ -82,6 +93,7 @@ async function syncHeartbeat(): Promise<void> {
   } catch (error) {
     logger.error('Heartbeat network error', error);
   }
+  ──────────────────────────────────────────────────────────────── */
 }
 
 /**

@@ -95,10 +95,11 @@ function startAllBackgroundServices(timeLogId: number, startTime: string): void 
   // Idle detection
   startIdleDetection(
     (idleMs) => {
+      console.log(`[Idle] User idle detected: ${idleMs}ms (${Math.round(idleMs / 1000)}s)`);
       mainWindow?.webContents.send(IPC.IDLE_DETECTED, { idleMs });
     },
     (idleMs) => {
-      // User returned from idle
+      console.log(`[Idle] User resumed after ${idleMs}ms idle`);
     },
   );
 
@@ -132,6 +133,8 @@ async function captureAndUploadScreenshot(timeLogId: number): Promise<void> {
   const filepath = await captureScreenshot();
   if (!filepath) return;
 
+  console.log(`[Screenshot] Captured for timeLogId=${timeLogId}: ${filepath}`);
+
   const { keyboardActivity, mouseActivity } = getActivityPercentages();
   resetActivityCounters();
 
@@ -153,6 +156,8 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.AUTH_GET_TOKENS, () => authStore.getTokens());
   ipcMain.handle(IPC.AUTH_SAVE_TOKENS, (_, data) => authStore.saveTokens(data));
   ipcMain.handle(IPC.AUTH_CLEAR_TOKENS, () => authStore.clearTokens());
+  ipcMain.handle(IPC.AUTH_GET_USER, () => authStore.getUser());
+  ipcMain.handle(IPC.AUTH_SAVE_USER, (_, data) => authStore.saveUser(data));
 
   // Timer start
   ipcMain.on(IPC.TIMER_START, (_, payload: { timeLogId: number; startTime: string }) => {

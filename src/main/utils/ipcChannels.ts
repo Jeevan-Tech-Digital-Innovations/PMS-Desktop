@@ -7,6 +7,8 @@ export const IPC = {
   AUTH_GET_TOKENS: 'auth:get-tokens',
   AUTH_SAVE_TOKENS: 'auth:save-tokens',
   AUTH_CLEAR_TOKENS: 'auth:clear-tokens',
+  AUTH_GET_USER: 'auth:get-user',
+  AUTH_SAVE_USER: 'auth:save-user',
 
   // Timer
   TIMER_START: 'timer:start',

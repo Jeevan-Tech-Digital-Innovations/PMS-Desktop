@@ -1,22 +1,32 @@
-// API endpoints
+// API endpoints — verified against PMS API controllers
+// Endpoints marked as NOT_IMPLEMENTED do not exist in the PMS API backend.
 export const API_ENDPOINTS = {
+  // ── Auth (AuthController: /api/v1/auth) ──────────────────────────
   AUTH_LOGIN: '/auth/login',
   AUTH_REFRESH: '/auth/refresh-token',
   AUTH_LOGOUT: '/auth/logout',
 
+  // ── Projects (ProjectController: /api/v1/projects) ──────────────
   PROJECTS: '/projects',
   PROJECT_TASKS: (projectId: number) => `/projects/${projectId}/tasks`,
 
+  // ── Time Logs (ProjectTaskController: /api/v1/tasks) ────────────
+  // The API uses @AuthenticationPrincipal (JWT) for userId — no query param needed.
   TIME_LOGS_START: (taskId: number) => `/tasks/${taskId}/time-logs/start`,
   TIME_LOGS_STOP: (taskId: number) => `/tasks/${taskId}/time-logs/end`,
 
-  BREAK_REASONS: '/breaks/reasons',
-  BREAK_START: (timeLogId: number) => `/tasks/time-logs/${timeLogId}/breaks/start`,
-  BREAK_STOP: (timeLogId: number) => `/tasks/time-logs/${timeLogId}/breaks/stop`,
-
-  NOTES_ADD: (timeLogId: number) => `/tasks/time-logs/${timeLogId}/notes`,
-
-  SCREENSHOTS_UPLOAD: (timeLogId: number) => `/time-logs/${timeLogId}/screenshots`,
+  // ── NOT IMPLEMENTED in PMS API ─────────────────────────────────
+  // The following endpoints do not exist in the PMS API backend.
+  // They are kept as comments for reference. When the backend adds
+  // these endpoints, uncomment and re-enable the corresponding service calls.
+  //
+  // BREAK_REASONS: '/breaks/reasons',
+  // BREAK_START: (timeLogId: number) => `/tasks/time-logs/${timeLogId}/breaks/start`,
+  // BREAK_STOP: (timeLogId: number) => `/tasks/time-logs/${timeLogId}/breaks/stop`,
+  //
+  // NOTES_ADD: (timeLogId: number) => `/tasks/time-logs/${timeLogId}/notes`,
+  //
+  // SCREENSHOTS_UPLOAD: (timeLogId: number) => `/time-logs/${timeLogId}/screenshots`,
 } as const;
 
 // UI thresholds

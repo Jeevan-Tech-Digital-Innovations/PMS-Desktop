@@ -1,5 +1,9 @@
 import { create } from 'zustand';
 import { User } from '@/types/auth';
+import { logoutApi } from '@/pages/Login/LoginApi.services';
+import { useTimerStore } from '@/stores/timerStore';
+import { useProjectStore } from '@/stores/projectStore';
+import { useUiStore } from '@/stores/uiStore';
 
 interface AuthState {
   user: User | null;
@@ -23,8 +27,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: true,
 
   setAuth: ({ user, accessToken, refreshToken, rememberMe }) => {
-    // Persist tokens via Electron main process
-    window.electronAPI?.saveTokens({ accessToken, refreshToken, rememberMe });
+    // Persist tokens AND user via Electron main process so they survive app restart
+    window.electronAPI?.saveTokens?.({ accessToken, refreshToken, rememberMe });
+    if (typeof window.electronAPI?.saveUser === 'function') {
+      window.electronAPI.saveUser(user);
+    }
 
     set({
       user,
@@ -35,6 +42,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: () => {
+    const { refreshToken } = get();
+    // Stop timer and reset all stores
+    useTimerStore.getState().stopTimer();
+    useTimerStore.getState().reset();
+    useProjectStore.getState().clearSelection();
+    useUiStore.getState().closeIdleModal();
+    useUiStore.getState().closeBreakModal();
+    useUiStore.getState().closeNoteModal();
+    // Stop Electron background services (screenshots, idle, heartbeat)
+    window.electronAPI?.stopTimer();
+    // Fire-and-forget: invalidate refresh token server-side
+    if (refreshToken) {
+      logoutApi(refreshToken);
+    }
     window.electronAPI?.clearTokens();
     set({
       user: null,
@@ -46,11 +67,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   checkStoredTokens: async () => {
     try {
-      const tokens = await window.electronAPI?.getStoredTokens();
+      const tokens = await window.electronAPI?.getStoredTokens?.();
+      const user =
+        typeof window.electronAPI?.getStoredUser === 'function'
+          ? await window.electronAPI.getStoredUser()
+          : null;
       if (tokens?.accessToken && tokens?.refreshToken) {
         set({
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken,
+          user: user ?? null,
           isAuthenticated: true,
         });
       }

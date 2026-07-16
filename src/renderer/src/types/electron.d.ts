@@ -7,6 +7,8 @@ interface ElectronAPI {
   getStoredTokens: () => Promise<{ accessToken: string | null; refreshToken: string | null }>;
   saveTokens: (data: { accessToken: string; refreshToken: string; rememberMe: boolean }) => Promise<void>;
   clearTokens: () => Promise<void>;
+  getStoredUser: () => Promise<{ userId: number; username: string; empNo: string; roles: string[] } | null>;
+  saveUser: (user: { userId: number; username: string; empNo: string; roles: string[] }) => Promise<void>;
 
   // Timer
   startTimer: (payload: { timeLogId: number; startTime: string }) => void;

@@ -54,11 +54,27 @@ export default function App() {
   useEffect(() => {
     // Global idle detection: pause timer and show modal regardless of current page
     const unsubscribe = window.electronAPI?.onIdleDetected((data) => {
+      console.log('[Idle] User idle detected:', {
+        idleMs: data.idleMs,
+        idleSeconds: Math.round(data.idleMs / 1000),
+        timestamp: new Date().toISOString(),
+      });
       const { isRunning, isIdlePaused } = useTimerStore.getState();
       if (isRunning && !isIdlePaused) {
         useTimerStore.getState().pauseForIdle();
         useUiStore.getState().openIdleModal(data.idleMs);
       }
+    });
+    return () => unsubscribe?.();
+  }, []);
+
+  useEffect(() => {
+    // Screenshot capture notifications
+    const unsubscribe = window.electronAPI?.onScreenshotUploaded((data) => {
+      console.log('[Screenshot] Captured and saved:', {
+        timeLogId: data.timeLogId,
+        timestamp: new Date().toISOString(),
+      });
     });
     return () => unsubscribe?.();
   }, []);

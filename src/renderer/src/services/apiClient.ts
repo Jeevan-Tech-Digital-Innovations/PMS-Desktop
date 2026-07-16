@@ -23,13 +23,18 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor: handle 401 and auto-refresh
+// Response interceptor: handle 401/403 and auto-refresh
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Spring Security may return 403 (default) or 401 (with AuthenticationEntryPoint)
+    // for missing/expired tokens. Handle both to trigger auto-refresh.
+    if (
+      (error.response?.status === 401 || error.response?.status === 403) &&
+      !originalRequest._retry
+    ) {
       originalRequest._retry = true;
 
       try {

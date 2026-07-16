@@ -9,6 +9,8 @@ const IPC = {
   AUTH_GET_TOKENS: 'auth:get-tokens',
   AUTH_SAVE_TOKENS: 'auth:save-tokens',
   AUTH_CLEAR_TOKENS: 'auth:clear-tokens',
+  AUTH_GET_USER: 'auth:get-user',
+  AUTH_SAVE_USER: 'auth:save-user',
   TIMER_START: 'timer:start',
   TIMER_STOP: 'timer:stop',
   TIMER_TICK: 'timer:tick',
@@ -30,6 +32,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveTokens: (data: { accessToken: string; refreshToken: string; rememberMe: boolean }) =>
     ipcRenderer.invoke(IPC.AUTH_SAVE_TOKENS, data),
   clearTokens: () => ipcRenderer.invoke(IPC.AUTH_CLEAR_TOKENS),
+  getStoredUser: () =>
+    ipcRenderer.invoke(IPC.AUTH_GET_USER) as Promise<{
+      userId: number;
+      username: string;
+      empNo: string;
+      roles: string[];
+    } | null>,
+  saveUser: (user: { userId: number; username: string; empNo: string; roles: string[] }) =>
+    ipcRenderer.invoke(IPC.AUTH_SAVE_USER, user),
 
   // ── Timer ─────────────────────────────────────────────────────
   startTimer: (payload: { timeLogId: number; startTime: string }) =>

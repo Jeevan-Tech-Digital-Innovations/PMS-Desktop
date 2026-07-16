@@ -1,9 +1,17 @@
 import Store from 'electron-store';
 
+interface StoredUser {
+  userId: number;
+  username: string;
+  empNo: string;
+  roles: string[];
+}
+
 interface AuthSchema {
   accessToken: string | null;
   refreshToken: string | null;
   rememberMe: boolean;
+  user: StoredUser | null;
 }
 
 const store = new Store<AuthSchema>({
@@ -12,6 +20,7 @@ const store = new Store<AuthSchema>({
     accessToken: null,
     refreshToken: null,
     rememberMe: false,
+    user: null,
   },
 });
 
@@ -32,9 +41,21 @@ export const authStore = {
     store.set('rememberMe', data.rememberMe);
   },
 
+  getUser(): StoredUser | null {
+    if (!store.get('rememberMe')) {
+      return null;
+    }
+    return store.get('user');
+  },
+
+  saveUser(user: StoredUser) {
+    store.set('user', user);
+  },
+
   clearTokens() {
     store.set('accessToken', null);
     store.set('refreshToken', null);
     store.set('rememberMe', false);
+    store.set('user', null);
   },
 };

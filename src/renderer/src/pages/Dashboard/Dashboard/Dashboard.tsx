@@ -78,7 +78,7 @@ export function Dashboard() {
         <button
           className={styles.startBtn}
           onClick={() =>
-            startMutation.mutate({ projectId: selectedProject.id, taskId: selectedTask.id })
+            startMutation.mutate({ taskId: selectedTask.id })
           }
           disabled={startMutation.isPending}
         >

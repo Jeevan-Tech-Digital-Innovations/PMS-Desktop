@@ -11,14 +11,13 @@ export function useStartTimeLog() {
   const setActiveTimeLog = useProjectStore((s) => s.setActiveTimeLog);
 
   const mutation = useMutation({
-    mutationFn: (payload: { projectId: number; taskId: number }) =>
-      startTimeLog(payload.projectId, payload.taskId),
+    mutationFn: (payload: { taskId: number }) => startTimeLog(payload.taskId),
     onSuccess: (data) => {
-      setActiveTimeLog(data.data);
+      setActiveTimeLog(data);
       startTimer();
       window.electronAPI?.startTimer({
-        timeLogId: data.data.id,
-        startTime: data.data.startTime,
+        timeLogId: data.id,
+        startTime: data.startTime,
       });
       navigate('/tracking');
     },
