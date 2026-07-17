@@ -20,6 +20,12 @@ import {
 } from './services/idle';
 import { startActiveWindowPoll, stopActiveWindowPoll, getActiveWindowTitle } from './services/activeWindow';
 import { startHeartbeat, stopHeartbeat, flushHeartbeat } from './services/heartbeat';
+import {
+  startAppActivityTracking,
+  stopAppActivityTracking,
+  flushAppActivity,
+  recordAppActivity,
+} from './services/appActivity';
 import { captureScreenshot, cleanupTempScreenshots } from './services/screenshot';
 import { uploadScreenshot } from './services/uploader';
 
@@ -100,7 +106,11 @@ function startAllBackgroundServices(timeLogId: number, startTime: string): void 
   startActiveWindowPoll((info) => {
     currentActiveWindowTitle = info.rawTitle;
     mainWindow?.webContents.send(IPC.ACTIVE_WINDOW_INFO, info);
+    recordAppActivity(info);
   });
+
+  // App activity tracking
+  startAppActivityTracking(timeLogId);
 
   // Heartbeat sync
   startHeartbeat(timeLogId, startTime);
@@ -119,6 +129,7 @@ function startAllBackgroundServices(timeLogId: number, startTime: string): void 
 
 function stopAllBackgroundServices(): void {
   console.log('[Background] Stopping all background services');
+  stopAppActivityTracking();
   stopActivityMonitor();
   stopIdleMonitor();
   stopActiveWindowPoll();
@@ -171,6 +182,7 @@ function registerIpcHandlers(): void {
   // Timer stop
   ipcMain.on(IPC.TIMER_STOP, async () => {
     await flushHeartbeat();
+    await flushAppActivity();
     stopAllBackgroundServices();
   });
 
@@ -226,8 +238,9 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', async () => {
   (app as any).isQuitting = true;
+  await flushAppActivity();
   stopAllBackgroundServices();
   cleanupTempScreenshots();
   destroyTray();
