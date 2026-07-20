@@ -8,6 +8,7 @@ import { useUiStore } from '@/stores/uiStore';
 import { useStartTimeLog } from '@/hooks/useStartTimeLog';
 import { formatTime } from '@/utils/formatTime';
 import { stopTimeLog } from '../TimeTrackingApi.services';
+import { stopBreak } from '@/services/BreakApi.services';
 import styles from './TimeTracking.module.css';
 
 export function TimeTracking() {
@@ -23,6 +24,7 @@ export function TimeTracking() {
     stopTimer,
     tick,
     tickBreak,
+    stopBreak: stopBreakTimer,
   } = useTimerStore();
   const selectedProject = useProjectStore((s) => s.selectedProject);
   const selectedTask = useProjectStore((s) => s.selectedTask);
@@ -74,6 +76,21 @@ export function TimeTracking() {
       return;
     }
     stopMutation.mutate();
+  };
+
+  const handleBreakToggle = async () => {
+    if (isOnBreak) {
+      if (!activeTimeLog) return;
+      try {
+        await stopBreak(activeTimeLog.id);
+        stopBreakTimer();
+        toast.success('Break stopped');
+      } catch (error: any) {
+        toast.error(error.response?.data?.message || 'Failed to stop break');
+      }
+    } else {
+      openBreakModal();
+    }
   };
 
   if (!selectedProject || !selectedTask) {
@@ -146,7 +163,7 @@ export function TimeTracking() {
       </div>
 
       <div className={styles.actions}>
-        <button className={styles.breakBtn} onClick={openBreakModal}>
+        <button className={styles.breakBtn} onClick={handleBreakToggle}>
           {isOnBreak ? 'Stop Break' : 'Break'}
         </button>
         <button className={styles.noteBtn} onClick={openNoteModal}>

@@ -1,5 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { ProfileMenu } from '@/components/ProfileMenu/ProfileMenu';
+import { BreakModal } from '@/components/BreakModal/BreakModal';
+import { NoteModal } from '@/components/NoteModal/NoteModal';
 import styles from './AppLayout.module.css';
 
 export function AppLayout() {
@@ -16,6 +18,8 @@ export function AppLayout() {
       <main className={styles.main}>
         <Outlet />
       </main>
+      <BreakModal />
+      <NoteModal />
     </div>
   );
 }
