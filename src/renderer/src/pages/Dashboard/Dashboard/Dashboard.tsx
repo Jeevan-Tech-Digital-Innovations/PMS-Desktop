@@ -47,7 +47,7 @@ export function Dashboard() {
         <div className={styles.counters}>
           <div className={styles.counter}>
             <span className={styles.counterLabel}>Work Time</span>
-            <span className={styles.counterValue}>{formatTime(workSeconds + idleSeconds)}</span>
+            <span className={styles.counterValue}>{formatTime(workSeconds)}</span>
           </div>
           <div className={styles.counter}>
             <span className={styles.counterLabel}>Idle Time</span>
