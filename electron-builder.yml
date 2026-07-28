@@ -1,6 +1,6 @@
 appId: com.workstatus.desktop
-productName: Workstatus Desktop
-copyright: Copyright © 2026 Workstatus
+productName: PMS Desktop
+copyright: Copyright © 2026 PMS
 
 directories:
   buildResources: resources

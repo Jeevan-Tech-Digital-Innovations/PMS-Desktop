@@ -9,7 +9,7 @@ export function AppLayout() {
     <div className={styles.layout}>
       <header className={styles.header}>
         <div className={styles.headerLeft}>
-          <h1 className={styles.brand}>Workstatus</h1>
+          <h1 className={styles.brand}>PMS</h1>
         </div>
         <div className={styles.headerRight}>
           <ProfileMenu />

@@ -21,6 +21,8 @@ export default function Login() {
           // Axis returns user.id as a string (UUID), so we might need to cast or adapt it depending on the store's strictness
           userId: authData.user?.id || 1, 
           username: authData.user?.email || 'user@example.com',
+          name: (authData.user?.email || 'User').split('@')[0],
+          email: authData.user?.email || 'user@example.com',
           empNo: authData.user?.empNo || 'EMP001',
           roles: authData.roles ? Object.keys(authData.roles) : ['ROLE_USER']
         };

@@ -13,8 +13,10 @@ export interface AuthTokens {
 }
 
 export interface User {
-  userId: number;
+  userId: number | string;
   username: string;
+  name?: string;
+  email?: string;
   empNo: string;
   roles: string[];
 }

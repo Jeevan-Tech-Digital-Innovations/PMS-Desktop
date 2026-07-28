@@ -29,9 +29,9 @@ export function ProfileMenu() {
     <div className={styles.wrapper}>
       <button className={styles.trigger} onClick={toggleProfileMenu}>
         <div className={styles.avatar}>
-          {user?.username?.charAt(0).toUpperCase() || 'U'}
+          {user?.name?.charAt(0).toUpperCase() || user?.username?.charAt(0).toUpperCase() || 'U'}
         </div>
-        <span className={styles.name}>{user?.username || 'User'}</span>
+        <span className={styles.name}>{user?.name || user?.username || 'User'}</span>
       </button>
 
       {isProfileMenuOpen && (
@@ -39,8 +39,8 @@ export function ProfileMenu() {
           <div className={styles.backdrop} onClick={closeProfileMenu} />
           <div className={styles.menu}>
             <div className={styles.menuHeader}>
-              <p className={styles.menuName}>{user?.username}</p>
-              <p className={styles.menuEmpNo}>{user?.empNo}</p>
+              <p className={styles.menuName}>{user?.name || user?.username}</p>
+              <p className={styles.menuEmpNo}>{user?.email || user?.empNo}</p>
             </div>
             <hr className={styles.divider} />
             <button className={styles.menuItem} onClick={() => handleNavigate('/dashboard')}>

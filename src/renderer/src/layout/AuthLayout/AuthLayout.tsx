@@ -6,7 +6,7 @@ export function AuthLayout() {
     <div className={styles.container}>
       <div className={styles.card}>
         <div className={styles.logoSection}>
-          <h1 className={styles.brand}>Workstatus</h1>
+          <h1 className={styles.brand}>PMS</h1>
           <p className={styles.tagline}>Desktop Time Tracking</p>
         </div>
         <Outlet />

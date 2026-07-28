@@ -55,7 +55,7 @@ function createWindow(): void {
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: 'Workstatus Desktop',
+    title: 'PMS Desktop',
     icon: path.join(__dirname, '../../resources/icon.png'),
     show: false,
     webPreferences: {

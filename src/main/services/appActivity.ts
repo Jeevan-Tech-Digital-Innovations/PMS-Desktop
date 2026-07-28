@@ -73,7 +73,7 @@ export function startAppActivityTracking(logId: number): void {
   stopAppActivityTracking();
 
   timeLogId = logId;
-  startNewSession({ app: 'Workstatus Desktop', task: '', rawTitle: 'Workstatus Desktop' });
+  startNewSession({ app: 'PMS Desktop', task: '', rawTitle: 'PMS Desktop' });
 
   flushHandle = setInterval(() => {
     flushAppActivity();
