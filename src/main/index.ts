@@ -174,6 +174,98 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.AUTH_GET_USER, () => authStore.getUser());
   ipcMain.handle(IPC.AUTH_SAVE_USER, (_, data) => authStore.saveUser(data));
 
+  ipcMain.handle(IPC.AUTH_LOGIN_SSO, async () => {
+    return new Promise((resolve, reject) => {
+      const isDev = !app.isPackaged;
+      const authWindow = new BrowserWindow({
+        width: 800,
+        height: 600,
+        show: false,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          webSecurity: !isDev,
+        },
+      });
+      authWindow.webContents.openDevTools();
+
+      // Use the actual Axis UI login endpoint with return_to parameter
+      const redirectUri = 'http://localhost:3000/desktop-callback';
+      const authUrl = `http://localhost:3000/login?return_to=${encodeURIComponent(redirectUri)}`;
+      
+      authWindow.webContents.on('did-fail-load', (e, errorCode, errorDescription) => {
+         console.error('authWindow failed to load:', errorCode, errorDescription);
+      });
+
+      authWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+         console.log(`[authWindow console] level: ${level} message: ${message} line: ${line} sourceId: ${sourceId}`);
+      });
+
+      authWindow.loadURL(authUrl);
+      authWindow.show();
+
+      let isResolved = false;
+
+      const handleNavigation = async (url: string) => {
+        if (url.startsWith(redirectUri) && !isResolved) {
+          isResolved = true;
+          try {
+            // Get the refresh cookie that was set by Axis login on localhost
+            const cookies = await authWindow.webContents.session.cookies.get({ domain: 'localhost' });
+            const refreshCookie = cookies.find(c => c.name === 'axis_refresh');
+            
+            if (refreshCookie) {
+              // Call Axis API to confirm access using the cookie
+              const response = await fetch('http://localhost:8081/v1/auth/confirm-access', {
+                method: 'POST',
+                headers: { 
+                  'Content-Type': 'application/json',
+                  'Cookie': `${refreshCookie.name}=${refreshCookie.value}`
+                }
+              });
+              
+              if (response.ok) {
+                const data = await response.json();
+                authWindow.close();
+                resolve(data);
+                return;
+              } else {
+                console.error(`Confirm access failed with status: ${response.status}`);
+              }
+            } else {
+               console.error('axis_refresh cookie not found after login');
+            }
+          } catch (err) {
+            console.error('SSO confirmation failed:', err);
+          }
+          
+          authWindow.close();
+          reject(new Error('Failed to obtain session via SSO'));
+        }
+      };
+
+      authWindow.webContents.on('will-navigate', (event, url) => {
+        if (url.startsWith(redirectUri)) {
+          event.preventDefault();
+          handleNavigation(url);
+        }
+      });
+
+      authWindow.webContents.on('will-redirect', (event, url) => {
+        if (url.startsWith(redirectUri)) {
+          event.preventDefault();
+          handleNavigation(url);
+        }
+      });
+      
+      authWindow.on('closed', () => {
+        if (!isResolved) {
+          reject(new Error('Auth window was closed by user'));
+        }
+      });
+    });
+  });
+
   // Timer start
   ipcMain.on(IPC.TIMER_START, (_, payload: { timeLogId: number; startTime: string }) => {
     startAllBackgroundServices(payload.timeLogId, payload.startTime);
