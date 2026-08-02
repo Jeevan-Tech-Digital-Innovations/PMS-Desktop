@@ -9,8 +9,8 @@ export const API_ENDPOINTS = {
   // ── Projects (ProjectController: /api/v1/projects) ──────────────
   PROJECTS: '/projects',
   PROJECT_TASKS: (projectId: number) => `/projects/${projectId}/tasks`,
-
   // ── Time Logs (ProjectTaskController: /api/v1/tasks) ────────────
+  SUB_TASKS: (taskId: number) => `/tasks/${taskId}/subtasks`,
   // The API uses @AuthenticationPrincipal (JWT) for userId — no query param needed.
   TIME_LOGS_START: (taskId: number) => `/tasks/${taskId}/time-logs/start`,
   TIME_LOGS_STOP: (taskId: number) => `/tasks/${taskId}/time-logs/end`,
