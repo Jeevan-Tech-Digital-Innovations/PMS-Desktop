@@ -12,6 +12,7 @@ const IPC = {
   AUTH_GET_USER: 'auth:get-user',
   AUTH_SAVE_USER: 'auth:save-user',
   AUTH_LOGIN_SSO: 'auth:login-sso',
+  AUTH_REFRESH_SESSION: 'auth:refresh-session',
   TIMER_START: 'timer:start',
   TIMER_STOP: 'timer:stop',
   TIMER_TICK: 'timer:tick',
@@ -44,7 +45,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     } | null>,
   saveUser: (user: { userId: number; username: string; empNo: string; roles: string[] }) =>
     ipcRenderer.invoke(IPC.AUTH_SAVE_USER, user),
-  loginSSO: () => ipcRenderer.invoke(IPC.AUTH_LOGIN_SSO),
+  loginSSO: (urls: { axisWebUrl: string, axisApiUrl: string }) => ipcRenderer.invoke(IPC.AUTH_LOGIN_SSO, urls),
+  refreshSession: (urls: { axisApiUrl: string }) => ipcRenderer.invoke(IPC.AUTH_REFRESH_SESSION, urls),
 
   // ── Timer ─────────────────────────────────────────────────────
   startTimer: (payload: { timeLogId: number; startTime: string }) =>

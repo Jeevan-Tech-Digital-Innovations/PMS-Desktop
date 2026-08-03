@@ -10,6 +10,7 @@ export const IPC = {
   AUTH_GET_USER: 'auth:get-user',
   AUTH_SAVE_USER: 'auth:save-user',
   AUTH_LOGIN_SSO: 'auth:login-sso',
+  AUTH_REFRESH_SESSION: 'auth:refresh-session',
 
   // Timer
   TIMER_START: 'timer:start',

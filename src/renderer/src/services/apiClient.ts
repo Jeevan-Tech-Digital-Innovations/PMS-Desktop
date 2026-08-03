@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useAuthStore } from '@/stores/authStore';
+import { config } from '@/config/config';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
 
@@ -38,32 +39,28 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = useAuthStore.getState().refreshToken;
-        if (!refreshToken) {
-          // No refresh token — force logout
-          useAuthStore.getState().logout();
-          return Promise.reject(error);
-        }
+        const data = await window.electronAPI!.refreshSession({ axisApiUrl: config.AXIS_API_URL });
 
-        const { data } = await axios.post(`${API_BASE_URL}/auth/refresh-token`, {
-          refreshToken,
-        });
-
-        const newAccessToken = data.data?.accessToken;
-        const newRefreshToken = data.data?.refreshToken;
+        // Our new Identity Service returns { data: { accessToken, ... } } or just { accessToken } depending on payload shape.
+        // Let's assume it returns { accessToken, user }
+        const newAccessToken = data.accessToken || data.data?.accessToken;
 
         if (newAccessToken) {
-          useAuthStore.setState({
+          useAuthStore.getState().setAuth({
+            user: data.user || data.data?.user || useAuthStore.getState().user,
             accessToken: newAccessToken,
-            refreshToken: newRefreshToken ?? refreshToken,
+            refreshToken: '', // Refresh token is now in a secure cookie, not state
+            rememberMe: true, // Preserve remember me state
           });
 
           // Retry original request with new token
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
           return apiClient(originalRequest);
+        } else {
+          throw new Error('Refresh session did not return an access token');
         }
       } catch (refreshError) {
-        // Refresh failed — force logout
+        // Refresh failed "?" force logout
         useAuthStore.getState().logout();
         return Promise.reject(refreshError);
       }

@@ -9,6 +9,8 @@ interface ElectronAPI {
   clearTokens: () => Promise<void>;
   getStoredUser: () => Promise<{ userId: number; username: string; empNo: string; roles: string[] } | null>;
   saveUser: (user: { userId: number; username: string; empNo: string; roles: string[] }) => Promise<void>;
+  loginSSO: (urls: { axisWebUrl: string; axisApiUrl: string }) => Promise<any>;
+  refreshSession: (urls: { axisApiUrl: string }) => Promise<any>;
 
   // Timer
   startTimer: (payload: { timeLogId: number; startTime: string }) => void;

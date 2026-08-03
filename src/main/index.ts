@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, session } from 'electron';
 import * as path from 'path';
 import { logger } from './utils/logger';
 import { authStore } from './utils/authStore';
@@ -174,7 +174,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.AUTH_GET_USER, () => authStore.getUser());
   ipcMain.handle(IPC.AUTH_SAVE_USER, (_, data) => authStore.saveUser(data));
 
-  ipcMain.handle(IPC.AUTH_LOGIN_SSO, async () => {
+  ipcMain.handle(IPC.AUTH_LOGIN_SSO, async (_, urls: { axisWebUrl: string, axisApiUrl: string }) => {
     return new Promise((resolve, reject) => {
       const isDev = !app.isPackaged;
       const authWindow = new BrowserWindow({
@@ -190,8 +190,10 @@ function registerIpcHandlers(): void {
       authWindow.webContents.openDevTools();
 
       // Use the actual Axis UI login endpoint with return_to parameter
-      const redirectUri = 'http://localhost:3000/desktop-callback';
-      const authUrl = `http://localhost:3000/login?return_to=${encodeURIComponent(redirectUri)}`;
+      const redirectUri = `${urls.axisWebUrl}/desktop-callback`;
+      const authUrl = `${urls.axisWebUrl}/login?return_to=${encodeURIComponent(redirectUri)}`;
+      
+      const domain = new URL(urls.axisApiUrl).hostname;
       
       authWindow.webContents.on('did-fail-load', (e, errorCode, errorDescription) => {
          console.error('authWindow failed to load:', errorCode, errorDescription);
@@ -207,22 +209,23 @@ function registerIpcHandlers(): void {
       let isResolved = false;
 
       const handleNavigation = async (url: string) => {
-        if (url.startsWith(redirectUri) && !isResolved) {
-          isResolved = true;
-          try {
-            // Get the refresh cookie that was set by Axis login on localhost
-            const cookies = await authWindow.webContents.session.cookies.get({ domain: 'localhost' });
-            const refreshCookie = cookies.find(c => c.name === 'axis_refresh');
-            
-            if (refreshCookie) {
-              // Call Axis API to confirm access using the cookie
-              const response = await fetch('http://localhost:8081/v1/auth/confirm-access', {
-                method: 'POST',
-                headers: { 
-                  'Content-Type': 'application/json',
-                  'Cookie': `${refreshCookie.name}=${refreshCookie.value}`
-                }
-              });
+          if (url.startsWith(redirectUri) && !isResolved) {
+            isResolved = true;
+            try {
+              // Get the refresh cookie that was set by Axis login
+              const cookies = await authWindow.webContents.session.cookies.get({ domain });
+              const refreshCookie = cookies.find(c => c.name === 'axis_refresh');
+              
+              if (refreshCookie) {
+                // Call Axis API to confirm access using the cookie
+                const confirmUrl = urls.axisApiUrl.replace(/\/api$/, '/v1') + '/auth/confirm-access';
+                const response = await fetch(confirmUrl, {
+                  method: 'POST',
+                  headers: { 
+                    'Content-Type': 'application/json',
+                    'Cookie': `${refreshCookie.name}=${refreshCookie.value}`
+                  }
+                });
               
               if (response.ok) {
                 const data = await response.json();
@@ -245,17 +248,11 @@ function registerIpcHandlers(): void {
       };
 
       authWindow.webContents.on('will-navigate', (event, url) => {
-        if (url.startsWith(redirectUri)) {
-          event.preventDefault();
-          handleNavigation(url);
-        }
+        handleNavigation(url);
       });
 
-      authWindow.webContents.on('will-redirect', (event, url) => {
-        if (url.startsWith(redirectUri)) {
-          event.preventDefault();
-          handleNavigation(url);
-        }
+      authWindow.webContents.on('did-redirect-navigation', (event, url) => {
+        handleNavigation(url);
       });
       
       authWindow.on('closed', () => {
@@ -264,6 +261,37 @@ function registerIpcHandlers(): void {
         }
       });
     });
+  });
+
+  ipcMain.handle(IPC.AUTH_REFRESH_SESSION, async (_, urls: { axisApiUrl: string }) => {
+    try {
+      const domain = new URL(urls.axisApiUrl).hostname;
+      // Use default session to find the axis_refresh cookie
+      const cookies = await session.defaultSession.cookies.get({ domain });
+      const refreshCookie = cookies.find(c => c.name === 'axis_refresh');
+      
+      if (!refreshCookie) {
+        throw new Error('No refresh cookie found');
+      }
+
+      const confirmUrl = urls.axisApiUrl.replace(/\/api$/, '/v1') + '/auth/confirm-access';
+      const response = await fetch(confirmUrl, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cookie': `${refreshCookie.name}=${refreshCookie.value}`
+        }
+      });
+      
+      if (response.ok) {
+        return await response.json();
+      } else {
+        throw new Error(`Refresh failed with status: ${response.status}`);
+      }
+    } catch (err) {
+      console.error('Session refresh failed:', err);
+      throw err;
+    }
   });
 
   // Timer start
