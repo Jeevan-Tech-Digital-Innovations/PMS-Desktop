@@ -1,5 +1,26 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { RefreshButton } from "@refinedev/antd";
+
+const MyRefreshComponent = ({ onClick, disabled }: any) => {
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onClick && !disabled) {
+      onClick();
+    }
+  };
+
+  return (
+    <div onClickCapture={handleClick} style={{ marginLeft: 'auto', display: 'flex', cursor: disabled ? 'not-allowed' : 'pointer' }}>
+      <RefreshButton
+        hideText
+        disabled={disabled}
+        style={{ pointerEvents: 'none' }}
+      />
+    </div>
+  );
+};
 import { useQuery } from '@tanstack/react-query';
 import { useProjectStore } from '@/stores/projectStore';
 import { fetchTasks, fetchSubTasks } from '../TasksApi.services';
@@ -19,13 +40,13 @@ export function Tasks() {
   const [search, setSearch] = useState('');
   const [selectedParentTask, setSelectedParentTask] = useState<Task | null>(null);
 
-  const { data: tasks = [], isLoading } = useQuery({
+  const { data: tasks = [], isLoading, refetch: refetchTasks, isRefetching: isRefetchingTasks } = useQuery({
     queryKey: ['tasks', projectId],
     queryFn: () => fetchTasks(Number(projectId)),
     enabled: !!projectId,
   });
 
-  const { data: subTasks = [], isLoading: isSubTasksLoading } = useQuery({
+  const { data: subTasks = [], isLoading: isSubTasksLoading, refetch: refetchSubTasks, isRefetching: isRefetchingSubTasks } = useQuery({
     queryKey: ['subTasks', selectedParentTask?.id],
     queryFn: () => fetchSubTasks(selectedParentTask!.id),
     enabled: !!selectedParentTask?.id,
@@ -64,6 +85,15 @@ export function Tasks() {
   }, [tasks, subTasks, selectedParentTask, search]);
 
   const currentlyLoading = isLoading || (selectedParentTask && isSubTasksLoading);
+  const isRefetching = isRefetchingTasks || isRefetchingSubTasks;
+
+  const handleRefresh = () => {
+    if (selectedParentTask) {
+      refetchSubTasks();
+    } else {
+      refetchTasks();
+    }
+  };
 
   return (
     <div className={styles.container}>
@@ -76,6 +106,7 @@ export function Tasks() {
             ? `Sub-Tasks: ${selectedParentTask.title}`
             : activeProject?.name || 'Select Task'}
         </h2>
+        <MyRefreshComponent onClick={handleRefresh} disabled={isRefetching} />
       </div>
 
       <input

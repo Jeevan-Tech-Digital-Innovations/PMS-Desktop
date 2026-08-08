@@ -1,5 +1,26 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { RefreshButton } from "@refinedev/antd";
+
+const MyRefreshComponent = ({ onClick, disabled }: any) => {
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onClick && !disabled) {
+      onClick();
+    }
+  };
+
+  return (
+    <div onClickCapture={handleClick} style={{ marginLeft: 'auto', display: 'flex', cursor: disabled ? 'not-allowed' : 'pointer' }}>
+      <RefreshButton
+        hideText
+        disabled={disabled}
+        style={{ pointerEvents: 'none' }}
+      />
+    </div>
+  );
+};
 import { useQuery } from '@tanstack/react-query';
 import { useProjectStore } from '@/stores/projectStore';
 import { fetchProjects } from '../ProjectsApi.services';
@@ -10,7 +31,7 @@ export function Projects() {
   const setDraftProject = useProjectStore((s) => s.setDraftProject);
   const [search, setSearch] = useState('');
 
-  const { data: projects = [], isLoading } = useQuery({
+  const { data: projects = [], isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['projects', search],
     queryFn: () => fetchProjects(search),
   });
@@ -27,6 +48,7 @@ export function Projects() {
           ← Back
         </button>
         <h2 className={styles.title}>Select Project</h2>
+        <MyRefreshComponent onClick={() => refetch()} disabled={isRefetching} />
       </div>
 
       <input
