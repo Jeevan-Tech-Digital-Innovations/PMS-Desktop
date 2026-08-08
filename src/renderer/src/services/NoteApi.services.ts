@@ -7,3 +7,32 @@ export const addNote = async (timeLogId: number, noteText: string) => {
   );
   return response.data;
 };
+
+export const getNotes = async (timeLogId: number) => {
+  const response = await apiClient.get(
+    `/tasks/time-logs/${timeLogId}/notes`
+  );
+  return response.data.data;
+};
+
+export const getNotesForTask = async (taskId: number) => {
+  const response = await apiClient.get(
+    `/tasks/${taskId}/notes`
+  );
+  return response.data.data;
+};
+
+export const updateNote = async (noteId: number, noteText: string) => {
+  const response = await apiClient.put(
+    `/notes/${noteId}`,
+    { noteText }
+  );
+  return response.data;
+};
+
+export const deleteNote = async (noteId: number) => {
+  const response = await apiClient.delete(
+    `/notes/${noteId}`
+  );
+  return response.data;
+};
