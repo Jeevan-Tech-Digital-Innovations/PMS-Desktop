@@ -21,7 +21,10 @@
   },
   "dependencies": {
     "@axis/auth-client": "file:../../Axis/axis-ui/packages/auth-client",
+    "@refinedev/antd": "^6.0.3",
+    "@refinedev/core": "^5.0.12",
     "active-win": "^8.2.0",
+    "antd": "^5.29.3",
     "axios": "^1.7.9",
     "electron-store": "^8.2.0",
     "electron-updater": "^6.3.0",
