@@ -254,7 +254,7 @@ export function TimeTracking() {
       </div>
 
       <div className={styles.timerSection}>
-        <div className={styles.timer}>{formatTime(workSeconds + idleSeconds)}</div>
+        <div className={styles.timer}>{formatTime(workSeconds + idleSeconds + breakSeconds)}</div>
         <div className={styles.counters}>
           <div className={styles.counter}>
             <span className={styles.counterLabel}>Work</span>

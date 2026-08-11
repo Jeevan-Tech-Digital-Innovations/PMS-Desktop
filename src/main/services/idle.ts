@@ -3,7 +3,7 @@ import { logger } from '../utils/logger';
 import { getMainWindow } from '../index';
 import { getIdleTimeMs, resetLastActivity } from './activity';
 
-const IDLE_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
+const IDLE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 const IDLE_THRESHOLD_SECONDS = Math.round(IDLE_THRESHOLD_MS / 1000);
 const POLL_INTERVAL_MS = 1000;
 

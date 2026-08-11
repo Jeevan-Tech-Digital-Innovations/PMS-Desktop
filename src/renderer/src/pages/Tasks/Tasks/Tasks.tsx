@@ -1,7 +1,5 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { RefreshButton } from "@refinedev/antd";
-
 const MyRefreshComponent = ({ onClick, disabled }: any) => {
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -12,13 +10,20 @@ const MyRefreshComponent = ({ onClick, disabled }: any) => {
   };
 
   return (
-    <div onClickCapture={handleClick} style={{ marginLeft: 'auto', display: 'flex', cursor: disabled ? 'not-allowed' : 'pointer' }}>
-      <RefreshButton
-        hideText
-        disabled={disabled}
-        style={{ pointerEvents: 'none' }}
-      />
-    </div>
+    <button 
+      onClick={handleClick} 
+      disabled={disabled}
+      style={{ 
+        marginLeft: 'auto', 
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        background: 'none',
+        border: 'none',
+        fontSize: '18px',
+        opacity: disabled ? 0.5 : 1
+      }}
+    >
+      ↻
+    </button>
   );
 };
 import { useQuery } from '@tanstack/react-query';
