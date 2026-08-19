@@ -31,14 +31,17 @@ import { useProjectStore } from '@/stores/projectStore';
 import { fetchProjects } from '../ProjectsApi.services';
 import styles from './Projects.module.css';
 
+import { useAuthStore } from '@/stores/authStore';
+
 export function Projects() {
   const navigate = useNavigate();
+  const userId = useAuthStore((s) => s.user?.userId);
   const setDraftProject = useProjectStore((s) => s.setDraftProject);
   const [search, setSearch] = useState('');
 
   const { data: projects = [], isLoading, refetch, isRefetching } = useQuery({
-    queryKey: ['projects', search],
-    queryFn: () => fetchProjects(search),
+    queryKey: ['projects', search, userId],
+    queryFn: () => fetchProjects(search, userId),
   });
 
   const handleSelect = (project: any) => {

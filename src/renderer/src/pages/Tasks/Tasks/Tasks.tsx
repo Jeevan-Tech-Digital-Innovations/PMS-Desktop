@@ -31,6 +31,7 @@ import { useProjectStore } from '@/stores/projectStore';
 import { fetchTasks, fetchSubTasks } from '../TasksApi.services';
 import { Task } from '@/types/task';
 import styles from './Tasks.module.css';
+import { useAuthStore } from '@/stores/authStore';
 
 export function Tasks() {
   const navigate = useNavigate();
@@ -42,39 +43,43 @@ export function Tasks() {
   const commitDraftSelection = useProjectStore((s) => s.commitDraftSelection);
   const clearDraftSelection = useProjectStore((s) => s.clearDraftSelection);
   
+  const userId = useAuthStore((s) => s.user?.userId);
+  
   const [search, setSearch] = useState('');
-  const [selectedParentTask, setSelectedParentTask] = useState<Task | null>(null);
+  const [parentStack, setParentStack] = useState<Task[]>([]);
+  const currentParent = parentStack.length > 0 ? parentStack[parentStack.length - 1] : null;
 
   const { data: tasks = [], isLoading, refetch: refetchTasks, isRefetching: isRefetchingTasks } = useQuery({
-    queryKey: ['tasks', projectId],
-    queryFn: () => fetchTasks(Number(projectId)),
-    enabled: !!projectId,
+    queryKey: ['tasks', projectId, userId],
+    queryFn: () => fetchTasks(Number(projectId), search, userId),
+    enabled: !!projectId && parentStack.length === 0,
   });
 
   const { data: subTasks = [], isLoading: isSubTasksLoading, refetch: refetchSubTasks, isRefetching: isRefetchingSubTasks } = useQuery({
-    queryKey: ['subTasks', selectedParentTask?.id],
-    queryFn: () => fetchSubTasks(selectedParentTask!.id),
-    enabled: !!selectedParentTask?.id,
+    queryKey: ['subTasks', currentParent?.id, userId],
+    queryFn: () => fetchSubTasks(Number(currentParent?.id), search, userId),
+    enabled: !!currentParent?.id,
   });
 
   const activeProject = draftProject || selectedProject;
 
   const handleSelect = (task: Task) => {
-    if (!selectedParentTask) {
-      // Step 1: User selected a parent task/folder. Show its sub-tasks.
-      setSelectedParentTask(task);
-      setSearch('');
-    } else {
-      // Step 2: User selected a sub-task. Start tracking!
-      setDraftTask(task);
-      commitDraftSelection();
-      navigate('/dashboard');
-    }
+    setDraftTask(task);
+    commitDraftSelection();
+    navigate('/dashboard');
+  };
+
+  const handleNavigate = (e: React.MouseEvent, task: Task) => {
+    e.stopPropagation();
+    setParentStack([...parentStack, task]);
+    setSearch('');
   };
 
   const handleBack = () => {
-    if (selectedParentTask) {
-      setSelectedParentTask(null);
+    if (parentStack.length > 0) {
+      const newStack = [...parentStack];
+      newStack.pop();
+      setParentStack(newStack);
       setSearch('');
     } else {
       clearDraftSelection();
@@ -82,18 +87,17 @@ export function Tasks() {
     }
   };
 
-  // Filter tasks or subtasks based on the current view and search input
   const displayedList = useMemo(() => {
-    const list = selectedParentTask ? subTasks : tasks;
+    const list = currentParent ? subTasks : tasks;
     if (!search.trim()) return list;
     return list.filter(t => t.title.toLowerCase().includes(search.toLowerCase()));
-  }, [tasks, subTasks, selectedParentTask, search]);
+  }, [tasks, subTasks, currentParent, search]);
 
-  const currentlyLoading = isLoading || (selectedParentTask && isSubTasksLoading);
+  const currentlyLoading = isLoading || (currentParent && isSubTasksLoading);
   const isRefetching = isRefetchingTasks || isRefetchingSubTasks;
 
   const handleRefresh = () => {
-    if (selectedParentTask) {
+    if (currentParent) {
       refetchSubTasks();
     } else {
       refetchTasks();
@@ -107,8 +111,8 @@ export function Tasks() {
           ← Back
         </button>
         <h2 className={styles.title}>
-          {selectedParentTask 
-            ? `Sub-Tasks: ${selectedParentTask.title}`
+          {currentParent 
+            ? currentParent.title
             : activeProject?.name || 'Select Task'}
         </h2>
         <MyRefreshComponent onClick={handleRefresh} disabled={isRefetching} />
@@ -117,7 +121,7 @@ export function Tasks() {
       <input
         className={styles.search}
         type="text"
-        placeholder={selectedParentTask ? "Search sub-tasks..." : "Search tasks..."}
+        placeholder={currentParent ? "Search sub-tasks..." : "Search tasks..."}
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
@@ -127,20 +131,29 @@ export function Tasks() {
           <p className={styles.loading}>Loading tasks...</p>
         ) : displayedList.length === 0 ? (
           <p className={styles.empty}>
-            {selectedParentTask ? 'No sub-tasks found' : 'No tasks found'}
+            {currentParent ? 'No sub-tasks found' : 'No tasks found'}
           </p>
         ) : (
           displayedList.map((task: Task) => (
-            <button
-              key={task.id}
-              className={`${styles.card} ${selectedTask?.id === task.id ? styles.selected : ''}`}
-              onClick={() => handleSelect(task)}
-            >
-              <span className={styles.name}>{task.title}</span>
-              <span className={styles.meta}>
-                {task.status} · {task.priority}
-              </span>
-            </button>
+            <div key={task.id} className={styles.taskRow}>
+              <button
+                className={`${styles.card} ${selectedTask?.id === task.id ? styles.selected : ''}`}
+                onClick={() => handleSelect(task)}
+                title="Select & Start Task"
+              >
+                <span className={styles.name}>{task.title}</span>
+                <span className={styles.meta}>
+                  {task.status} · {task.priority}
+                </span>
+              </button>
+              <button
+                className={styles.navigateBtn}
+                onClick={(e) => handleNavigate(e, task)}
+                title="View Sub-tasks"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </div>
           ))
         )}
       </div>
