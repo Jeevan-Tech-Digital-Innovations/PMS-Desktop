@@ -30,7 +30,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Persist tokens AND user via Electron main process so they survive app restart
     window.electronAPI?.saveTokens?.({ accessToken, refreshToken, rememberMe });
     if (typeof window.electronAPI?.saveUser === 'function') {
-      window.electronAPI.saveUser(user);
+      window.electronAPI.saveUser({ ...user, userId: Number(user.userId) });
     }
 
     set({
