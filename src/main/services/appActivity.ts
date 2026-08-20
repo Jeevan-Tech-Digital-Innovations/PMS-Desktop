@@ -119,13 +119,22 @@ async function sendBatch(logId: number, events: AppActivityEvent[]): Promise<voi
   }
 
   try {
-    const response = await fetch(`${API_BASE}/activity/apps/${logId}/batch`, {
+    const payload = events.map(e => ({
+      appName: e.appName,
+      url: e.taskTitle,
+      startTime: e.startTime,
+      endTime: e.endTime,
+      durationSeconds: e.durationSeconds,
+      timeLogId: logId
+    }));
+
+    const response = await fetch(`${API_BASE}/activity/apps/bulk`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({ events }),
+      body: JSON.stringify(payload),
     });
 
     if (response.ok) {
