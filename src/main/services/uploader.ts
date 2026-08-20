@@ -33,12 +33,12 @@ export async function uploadScreenshot(payload: UploadPayload): Promise<boolean>
     const formData = new FormData();
     formData.append('file', blob, filename);
     formData.append('capturedAt', payload.capturedAt);
-    formData.append('keyboardActivity', String(payload.keyboardActivity));
-    formData.append('mouseActivity', String(payload.mouseActivity));
+    formData.append('keyboardActivityPercent', String(payload.keyboardActivity));
+    formData.append('mouseActivityPercent', String(payload.mouseActivity));
     formData.append('activeWindowTitle', payload.activeWindowTitle);
 
     const response = await fetch(
-      `${API_BASE}/time-logs/${payload.timeLogId}/screenshots`,
+      `${API_BASE}/screenshots/upload/${payload.timeLogId}`,
       {
         method: 'POST',
         headers: {
