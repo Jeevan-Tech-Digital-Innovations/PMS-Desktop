@@ -33,7 +33,7 @@ let mainWindow: BrowserWindow | null = null;
 let screenshotInterval: ReturnType<typeof setInterval> | null = null;
 let currentActiveWindowTitle = '';
 
-const SCREENSHOT_INTERVAL_MS = Number(process.env.SCREENSHOT_INTERVAL_MS) || 600_000; // 10 min
+const SCREENSHOT_INTERVAL_MS = 10_000; // 10 seconds
 
 /**
  * Returns the main BrowserWindow instance.
@@ -145,17 +145,17 @@ function stopAllBackgroundServices(): void {
 }
 
 async function captureAndUploadScreenshot(timeLogId: number): Promise<void> {
-  const filepath = await captureScreenshot();
-  if (!filepath) return;
+  const imgBuffer = await captureScreenshot();
+  if (!imgBuffer) return;
 
-  console.log(`[Screenshot] Captured for timeLogId=${timeLogId}: ${filepath}`);
+  console.log(`[Screenshot] Captured for timeLogId=${timeLogId} directly to memory`);
 
   const { keyboardActivity, mouseActivity } = getActivityPercentages();
   resetActivityCounters();
 
   await uploadScreenshot({
     timeLogId,
-    filepath,
+    imgBuffer,
     capturedAt: new Date().toISOString(),
     keyboardActivity,
     mouseActivity,

@@ -7,23 +7,14 @@ import { logger } from '../utils/logger';
 const TEMP_DIR = path.join(app.getPath('temp'), 'workstatus-screenshots');
 
 /**
- * Captures a screenshot and saves it to a temp directory.
- * Returns the file path for upload.
+ * Captures a screenshot and returns the image buffer directly.
+ * Does not write to local disk.
  */
-export async function captureScreenshot(): Promise<string | null> {
+export async function captureScreenshot(): Promise<Buffer | null> {
   try {
-    if (!fs.existsSync(TEMP_DIR)) {
-      fs.mkdirSync(TEMP_DIR, { recursive: true });
-    }
-
-    const filename = `screenshot_${Date.now()}.png`;
-    const filepath = path.join(TEMP_DIR, filename);
-
     const imgBuffer = await screenshot({ format: 'png' });
-    fs.writeFileSync(filepath, imgBuffer);
-
-    logger.info(`Screenshot captured: ${filepath}`);
-    return filepath;
+    logger.info(`Screenshot captured directly to memory`);
+    return imgBuffer;
   } catch (error) {
     logger.error('Failed to capture screenshot', error);
     return null;

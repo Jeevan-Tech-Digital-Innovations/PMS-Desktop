@@ -62,4 +62,41 @@ export const authStore = {
     store.set('rememberMe', false);
     store.set('user', null);
   },
+
+  async refreshSession(): Promise<string> {
+    const { session } = require('electron');
+    const axisApiUrl = process.env.VITE_AXIS_API_URL || 'http://localhost:8081/api';
+    const domain = new URL(axisApiUrl).hostname;
+    
+    // Use default session to find the axis_refresh cookie
+    const cookies = await session.defaultSession.cookies.get({ domain });
+    const refreshCookie = cookies.find((c: any) => c.name === 'axis_refresh');
+    
+    if (!refreshCookie) {
+      throw new Error('No refresh cookie found');
+    }
+
+    const confirmUrl = axisApiUrl.replace(/\/api$/, '/v1') + '/auth/confirm-access';
+    const response = await fetch(confirmUrl, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Cookie': `${refreshCookie.name}=${refreshCookie.value}`
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      const newAccessToken = data.accessToken || data.data?.accessToken;
+      if (newAccessToken) {
+        store.set('accessToken', newAccessToken);
+        // Inform the renderer that the token has changed! Wait, we can't easily IPC back, 
+        // but next time renderer fetches or reloads, it gets from authStore
+        return newAccessToken;
+      }
+      throw new Error('Refresh session did not return an access token');
+    } else {
+      throw new Error(`Refresh failed with status: ${response.status}`);
+    }
+  }
 };
