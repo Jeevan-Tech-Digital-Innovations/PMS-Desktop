@@ -31,7 +31,7 @@ export default function Login() {
           name: (userData.email || 'User').split('@')[0],
           email: userData.email || 'user@example.com',
           empNo: userData.empNo || 'EMP001',
-          roles: authData.roles ? Object.keys(authData.roles) : ['ROLE_USER']
+          roles: authData.roles ? Object.keys(authData.roles) : []
         };
         
         setAuth({
