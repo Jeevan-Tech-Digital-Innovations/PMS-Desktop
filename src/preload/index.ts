@@ -38,12 +38,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   clearTokens: () => ipcRenderer.invoke(IPC.AUTH_CLEAR_TOKENS),
   getStoredUser: () =>
     ipcRenderer.invoke(IPC.AUTH_GET_USER) as Promise<{
-      userId: number;
+      userId: number | string;
       username: string;
       empNo: string;
       roles: string[];
     } | null>,
-  saveUser: (user: { userId: number; username: string; empNo: string; roles: string[] }) =>
+  saveUser: (user: { userId: number | string; username: string; empNo: string; roles: string[] }) =>
     ipcRenderer.invoke(IPC.AUTH_SAVE_USER, user),
   loginSSO: (urls: { axisWebUrl: string, axisApiUrl: string }) => ipcRenderer.invoke(IPC.AUTH_LOGIN_SSO, urls),
   refreshSession: (urls: { axisApiUrl: string }) => ipcRenderer.invoke(IPC.AUTH_REFRESH_SESSION, urls),

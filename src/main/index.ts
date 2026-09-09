@@ -218,7 +218,7 @@ function registerIpcHandlers(): void {
               
               if (refreshCookie) {
                 // Call Axis API to confirm access using the cookie
-                const confirmUrl = urls.axisApiUrl.replace(/\/api$/, '/v1') + '/auth/confirm-access';
+                const confirmUrl = urls.axisApiUrl.replace(/\/api\/?$/, '/api/v1') + '/auth/confirm-access';
                 const response = await fetch(confirmUrl, {
                   method: 'POST',
                   headers: { 
@@ -274,7 +274,7 @@ function registerIpcHandlers(): void {
         throw new Error('No refresh cookie found');
       }
 
-      const confirmUrl = urls.axisApiUrl.replace(/\/api$/, '/v1') + '/auth/confirm-access';
+      const confirmUrl = urls.axisApiUrl.replace(/\/api\/?$/, '/api/v1') + '/auth/confirm-access';
       const response = await fetch(confirmUrl, {
         method: 'POST',
         headers: { 
