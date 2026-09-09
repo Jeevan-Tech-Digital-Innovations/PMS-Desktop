@@ -138,7 +138,7 @@
 .startBtn {
   width: 100%;
   padding: 0.75rem;
-  background: #2563eb;
+  background: #1677ff;
   color: white;
   font-weight: 600;
   font-size: 0.875rem;
@@ -149,7 +149,7 @@
 }
 
 .startBtn:hover {
-  background: #1d4ed8;
+  background: #4096ff;
 }
 
 .notesSection {
@@ -215,7 +215,7 @@
 }
 
 .actionBtn:hover {
-  color: #3b82f6;
+  color: #1677ff;
   background: #f1f5f9;
 }
 
@@ -250,12 +250,12 @@
 }
 
 .saveBtn {
-  background: #3b82f6;
+  background: #1677ff;
   color: white;
 }
 
 .saveBtn:hover {
-  background: #2563eb;
+  background: #4096ff;
 }
 
 .cancelBtn {

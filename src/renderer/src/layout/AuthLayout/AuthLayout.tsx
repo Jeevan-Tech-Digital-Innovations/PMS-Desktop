@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router-dom';
+import jtLogo from '@/assets/JT_Logo.png';
 import styles from './AuthLayout.module.css';
 
 export function AuthLayout() {
@@ -6,7 +7,7 @@ export function AuthLayout() {
     <div className={styles.container}>
       <div className={styles.card}>
         <div className={styles.logoSection}>
-          <h1 className={styles.brand}>PMS</h1>
+          <img src={jtLogo} alt="Jeevantech Digital Innovations" className={styles.logo} />
           <p className={styles.tagline}>Desktop Time Tracking</p>
         </div>
         <Outlet />
