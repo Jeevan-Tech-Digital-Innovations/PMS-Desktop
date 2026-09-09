@@ -18,7 +18,14 @@
 .headerLeft {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.625rem;
+}
+
+.logo {
+  height: 38px;
+  width: auto;
+  object-fit: contain;
+  -webkit-app-region: no-drag;
 }
 
 .headerRight {
@@ -29,9 +36,12 @@
 }
 
 .brand {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #2563eb;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #000000;
+  letter-spacing: 0.5px;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  -webkit-app-region: no-drag;
 }
 
 .main {

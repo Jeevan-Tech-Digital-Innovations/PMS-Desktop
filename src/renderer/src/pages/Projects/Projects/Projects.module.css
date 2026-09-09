@@ -13,7 +13,7 @@
 .backBtn {
   background: none;
   border: none;
-  color: #2563eb;
+  color: #1677ff;
   font-size: 0.875rem;
   cursor: pointer;
   padding: 0.25rem 0;
@@ -69,7 +69,7 @@
 
 .search:focus {
   outline: none;
-  border-color: #2563eb;
+  border-color: #1677ff;
 }
 
 .list {
@@ -94,7 +94,7 @@
 }
 
 .card:hover {
-  border-color: #2563eb;
+  border-color: #1677ff;
 }
 
 .name {

@@ -55,7 +55,7 @@ export default function Login() {
 
   return (
     <div className={styles.form}>
-      <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Welcome to PMS</h2>
+      <h2 style={{ textAlign: 'center', marginBottom: '1.5rem', color: '#666', fontWeight: 400, fontFamily: "'Inter', 'Segoe UI', sans-serif", fontSize: '0.9375rem' }}>Welcome to PMS</h2>
       <p style={{ textAlign: 'center', marginBottom: '2rem', color: '#666' }}>
         Log in via Axis Single Sign-On
       </p>

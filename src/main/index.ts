@@ -49,14 +49,16 @@ function createWindow(): void {
   Menu.setApplicationMenu(null);
 
   const isDev = !app.isPackaged;
+  const iconFile = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
+  const iconPath = path.join(__dirname, '../../resources', iconFile);
 
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: 'PMS Desktop',
-    icon: path.join(__dirname, '../../resources/icon.png'),
+    title: 'Jeevantech Digital Innovations',
+    icon: iconPath,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
@@ -67,6 +69,10 @@ function createWindow(): void {
       backgroundThrottling: false, // Keep timer/idle detection running when not focused
     },
   });
+
+  if (process.platform === 'win32') {
+    mainWindow.setIcon(iconPath);
+  }
 
   // Show window once ready
   mainWindow.once('ready-to-show', () => {

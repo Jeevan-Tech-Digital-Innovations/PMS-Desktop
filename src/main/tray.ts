@@ -13,7 +13,7 @@ export function createTray(mainWindow: BrowserWindow): Tray {
   const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
 
   tray = new Tray(icon);
-  tray.setToolTip('PMS Desktop');
+  tray.setToolTip('Jeevantech Digital Innovations');
 
   const contextMenu = Menu.buildFromTemplate([
     {
