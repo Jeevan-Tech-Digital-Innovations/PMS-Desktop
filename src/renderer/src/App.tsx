@@ -11,6 +11,7 @@ import { Projects } from '@/pages/Projects';
 import { Tasks } from '@/pages/Tasks';
 import { TimeTracking } from '@/pages/TimeTracking';
 import { Settings } from '@/pages/Settings';
+import { Profile } from '@/pages/Profile';
 
 // Layout imports
 import { AuthLayout } from '@/layout/AuthLayout/AuthLayout';
@@ -159,6 +160,7 @@ export default function App() {
           <Route path="/tasks/:projectId" element={<Tasks />} />
           <Route path="/tracking" element={<TimeTracking />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/profile" element={<Profile />} />
         </Route>
 
         {/* Default redirect */}

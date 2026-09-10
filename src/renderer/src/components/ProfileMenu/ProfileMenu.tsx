@@ -25,13 +25,24 @@ export function ProfileMenu() {
     window.electronAPI?.quitApp();
   };
 
+  const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.name || user?.username || 'User';
+  
+  const getInitials = (nameStr: string) => {
+    if (!nameStr) return 'U';
+    const parts = nameStr.split(' ');
+    if (parts.length >= 2 && parts[0] && parts[1]) {
+      return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
+    }
+    return nameStr.substring(0, 2).toUpperCase();
+  };
+
   return (
     <div className={styles.wrapper}>
       <button className={styles.trigger} onClick={toggleProfileMenu}>
         <div className={styles.avatar}>
-          {user?.name?.charAt(0).toUpperCase() || user?.username?.charAt(0).toUpperCase() || 'U'}
+          {getInitials(displayName)}
         </div>
-        <span className={styles.name}>{user?.name || user?.username || 'User'}</span>
+        <span className={styles.name}>{displayName}</span>
       </button>
 
       {isProfileMenuOpen && (
@@ -39,10 +50,13 @@ export function ProfileMenu() {
           <div className={styles.backdrop} onClick={closeProfileMenu} />
           <div className={styles.menu}>
             <div className={styles.menuHeader}>
-              <p className={styles.menuName}>{user?.name || user?.username}</p>
-              <p className={styles.menuEmpNo}>{user?.email || user?.empNo}</p>
+              <p className={styles.menuName}>{displayName}</p>
+              <p className={styles.menuEmpNo}>{user?.email || user?.username}</p>
             </div>
             <hr className={styles.divider} />
+            <button className={styles.menuItem} onClick={() => handleNavigate('/profile')}>
+              My Profile
+            </button>
             <button className={styles.menuItem} onClick={() => handleNavigate('/dashboard')}>
               Dashboard
             </button>

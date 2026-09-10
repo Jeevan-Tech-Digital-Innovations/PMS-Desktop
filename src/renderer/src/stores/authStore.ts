@@ -17,6 +17,7 @@ interface AuthState {
   logout: () => void;
   checkStoredTokens: () => Promise<void>;
   setLoading: (loading: boolean) => void;
+  updateAuthSession: (accessToken: string, roles: string[], tenantName: string) => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -38,6 +39,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       accessToken,
       refreshToken,
       isAuthenticated: true,
+    });
+  },
+
+  updateAuthSession: (accessToken: string, roles: string[], tenantName: string) => {
+    const currentState = get();
+    if (!currentState.user) return;
+    
+    const updatedUser = {
+      ...currentState.user,
+      roles,
+      tenantName
+    };
+
+    window.electronAPI?.saveTokens?.({ 
+      accessToken, 
+      refreshToken: currentState.refreshToken || '', 
+      rememberMe: true 
+    });
+    if (typeof window.electronAPI?.saveUser === 'function') {
+      window.electronAPI.saveUser(updatedUser as any);
+    }
+
+    set({
+      accessToken,
+      user: updatedUser
     });
   },
 

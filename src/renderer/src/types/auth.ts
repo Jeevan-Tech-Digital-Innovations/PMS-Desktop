@@ -16,9 +16,13 @@ export interface User {
   userId: number | string;
   username: string;
   name?: string;
+  firstName?: string;
+  lastName?: string;
   email?: string;
   empNo: string;
   roles: string[];
+  tenantName?: string;
+  tenants?: Array<{ id: string; name: string }>;
 }
 
 export interface LoginResponse {

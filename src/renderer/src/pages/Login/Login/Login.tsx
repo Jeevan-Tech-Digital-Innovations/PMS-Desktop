@@ -24,14 +24,21 @@ export default function Login() {
       if (accessToken) {
         // Here we parse the JWT or use default values if needed
         const userData = authData.user || authData.data?.user || {};
+        
+        // Axis returns first_name and last_name
+        const computedName = [userData.first_name || userData.firstName, userData.last_name || userData.lastName]
+          .filter(Boolean)
+          .join(' ') || userData.name || userData.email || 'User';
+
         const user = {
           // Axis returns user.id as a string (UUID), so we might need to cast or adapt it depending on the store's strictness
           userId: userData.id || 1, 
           username: userData.email || 'user@example.com',
-          name: (userData.email || 'User').split('@')[0],
+          name: computedName,
           email: userData.email || 'user@example.com',
           empNo: userData.empNo || 'EMP001',
-          roles: authData.roles ? Object.keys(authData.roles) : []
+          roles: authData.roles ? Object.keys(authData.roles) : [],
+          tenants: authData.memberships ? authData.memberships.map((m: any) => ({ id: m.tenant_id, name: m.tenant_name })) : []
         };
         
         setAuth({
