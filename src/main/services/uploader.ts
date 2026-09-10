@@ -26,7 +26,7 @@ export async function uploadScreenshot(payload: UploadPayload): Promise<boolean>
 
   try {
     const filename = `screenshot_${Date.now()}.png`;
-    const blob = new Blob([payload.imgBuffer], { type: 'image/png' });
+    const blob = new Blob([new Uint8Array(payload.imgBuffer)], { type: 'image/png' });
 
     const formData = new FormData();
     formData.append('file', blob, filename);

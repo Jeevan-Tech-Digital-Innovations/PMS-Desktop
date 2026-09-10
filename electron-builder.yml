@@ -1,6 +1,6 @@
 appId: com.workstatus.desktop
-productName: PMS Desktop
-copyright: Copyright © 2026 PMS
+productName: ENJEV | PMS Desktop
+copyright: Copyright © 2026 ENJEV
 
 directories:
   buildResources: resources
@@ -12,6 +12,10 @@ files:
   - '!electron.vite.config.*'
   - '!{.eslintignore,.eslintrc.json,.prettierignore,.prettierrc,dev-app-update.yml,CHANGELOG.md}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+
+extraResources:
+  - from: resources/icon.png
+    to: icon.png
 
 win:
   target:
@@ -40,5 +44,5 @@ linux:
 
 publish:
   provider: generic
-  url: ${env.UPDATE_SERVER_URL}
+  url: https://releases.workstatus.com
   channel: latest

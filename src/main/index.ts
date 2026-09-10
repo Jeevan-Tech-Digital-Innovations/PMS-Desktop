@@ -57,8 +57,8 @@ function createWindow(): void {
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: 'Jeevantech Digital Innovations',
-    icon: iconPath,
+    title: 'ENJEV | PMS Desktop',
+    icon: path.join(__dirname, '../../resources/icon.png'),
     show: false,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
@@ -70,9 +70,6 @@ function createWindow(): void {
     },
   });
 
-  if (process.platform === 'win32') {
-    mainWindow.setIcon(iconPath);
-  }
 
   // Show window once ready
   mainWindow.once('ready-to-show', () => {
@@ -90,15 +87,20 @@ function createWindow(): void {
   // Load renderer
   if (process.env.ELECTRON_RENDERER_URL) {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
-    if (isDev) {
-      mainWindow.webContents.openDevTools();
-    }
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
 
+  // F12 to toggle DevTools in production
+  mainWindow.webContents.on('before-input-event', (_, input) => {
+    if (input.key === 'F12' && input.type === 'keyDown') {
+      mainWindow?.webContents.toggleDevTools();
+    }
+  });
+
   logger.info('Main window created');
 }
+
 
 // ── Background Services Orchestration ────────────────────────────
 function startAllBackgroundServices(timeLogId: number, startTime: string): void {
@@ -193,20 +195,20 @@ function registerIpcHandlers(): void {
           webSecurity: !isDev,
         },
       });
-      authWindow.webContents.openDevTools();
+
 
       // Use the actual Axis UI login endpoint with return_to parameter
       const redirectUri = `${urls.axisWebUrl}/desktop-callback`;
       const authUrl = `${urls.axisWebUrl}/login?return_to=${encodeURIComponent(redirectUri)}`;
-      
+
       const domain = new URL(urls.axisApiUrl).hostname;
-      
+
       authWindow.webContents.on('did-fail-load', (e, errorCode, errorDescription) => {
-         console.error('authWindow failed to load:', errorCode, errorDescription);
+        console.error('authWindow failed to load:', errorCode, errorDescription);
       });
 
       authWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
-         console.log(`[authWindow console] level: ${level} message: ${message} line: ${line} sourceId: ${sourceId}`);
+        console.log(`[authWindow console] level: ${level} message: ${message} line: ${line} sourceId: ${sourceId}`);
       });
 
       authWindow.loadURL(authUrl);
@@ -215,24 +217,35 @@ function registerIpcHandlers(): void {
       let isResolved = false;
 
       const handleNavigation = async (url: string) => {
-          if (url.startsWith(redirectUri) && !isResolved) {
-            isResolved = true;
-            try {
-              // Get the refresh cookie that was set by Axis login
-              const cookies = await authWindow.webContents.session.cookies.get({ domain });
-              const refreshCookie = cookies.find(c => c.name === 'axis_refresh');
-              
-              if (refreshCookie) {
-                // Call Axis API to confirm access using the cookie
-                const confirmUrl = urls.axisApiUrl.replace(/\/api\/?$/, '/api/v1') + '/auth/confirm-access';
-                const response = await fetch(confirmUrl, {
-                  method: 'POST',
-                  headers: { 
-                    'Content-Type': 'application/json',
-                    'Cookie': `${refreshCookie.name}=${refreshCookie.value}`
-                  }
-                });
-              
+        if (url.startsWith(redirectUri) && !isResolved) {
+          isResolved = true;
+          try {
+            // Wait for the cookie to be set (up to 2 seconds)
+            let refreshCookie;
+            let allCookiesHeader = '';
+            for (let i = 0; i < 10; i++) {
+              const cookies = await authWindow.webContents.session.cookies.get({});
+              const refresh = cookies.find(c => c.name === 'axis_refresh');
+              if (refresh) {
+                refreshCookie = refresh;
+                // Build a cookie string with all cookies just in case the backend needs others (e.g. session/CSRF)
+                allCookiesHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+                break;
+              }
+              await new Promise(resolve => setTimeout(resolve, 200));
+            }
+
+            if (refreshCookie) {
+              // Call Axis API to confirm access using the cookie
+              const confirmUrl = urls.axisApiUrl.replace(/\/api\/?$/, '/api/v1') + '/auth/confirm-access';
+              const response = await fetch(confirmUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Cookie': allCookiesHeader
+                }
+              });
+
               if (response.ok) {
                 const data = await response.json();
                 authWindow.close();
@@ -242,25 +255,32 @@ function registerIpcHandlers(): void {
                 console.error(`Confirm access failed with status: ${response.status}`);
               }
             } else {
-               console.error('axis_refresh cookie not found after login');
+              console.error('axis_refresh cookie not found after login redirect');
             }
           } catch (err) {
             console.error('SSO confirmation failed:', err);
           }
-          
+
           authWindow.close();
           reject(new Error('Failed to obtain session via SSO'));
         }
       };
 
       authWindow.webContents.on('will-navigate', (event, url) => {
-        handleNavigation(url);
+        if (url.startsWith(redirectUri) && !isResolved) {
+          event.preventDefault(); // Stop the Axis UI from loading the callback route
+          handleNavigation(url);
+        }
       });
 
       authWindow.webContents.on('did-redirect-navigation', (event, url) => {
-        handleNavigation(url);
+        if (url.startsWith(redirectUri) && !isResolved) {
+          // Cannot preventDefault on did-redirect, but we can stop loading
+          authWindow.webContents.stop();
+          handleNavigation(url);
+        }
       });
-      
+
       authWindow.on('closed', () => {
         if (!isResolved) {
           reject(new Error('Auth window was closed by user'));
@@ -275,7 +295,7 @@ function registerIpcHandlers(): void {
       // Use default session to find the axis_refresh cookie
       const cookies = await session.defaultSession.cookies.get({ domain });
       const refreshCookie = cookies.find(c => c.name === 'axis_refresh');
-      
+
       if (!refreshCookie) {
         throw new Error('No refresh cookie found');
       }
@@ -283,12 +303,12 @@ function registerIpcHandlers(): void {
       const confirmUrl = urls.axisApiUrl.replace(/\/api\/?$/, '/api/v1') + '/auth/confirm-access';
       const response = await fetch(confirmUrl, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Cookie': `${refreshCookie.name}=${refreshCookie.value}`
         }
       });
-      
+
       if (response.ok) {
         return await response.json();
       } else {

@@ -8,8 +8,11 @@ let tray: Tray | null = null;
  * Creates the system tray icon and context menu.
  */
 export function createTray(mainWindow: BrowserWindow): Tray {
-  // Use a 16x16 or 32x32 icon for tray
-  const iconPath = path.join(__dirname, '../../resources/icon.png');
+  // Resolve tray icon path safely between dev and production
+  const iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'icon.png')
+    : path.join(__dirname, '../../resources/icon.png');
+    
   const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
 
   tray = new Tray(icon);

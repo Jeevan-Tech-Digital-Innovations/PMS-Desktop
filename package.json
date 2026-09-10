@@ -20,7 +20,7 @@
     "package:linux": "electron-vite build && electron-builder --linux"
   },
   "dependencies": {
-    "@axis/auth-client": "file:../../Axis/axis-ui/packages/auth-client",
+    "@axis/auth-client": "file:./axis-auth-client-0.1.0.tgz",
     "@refinedev/antd": "^6.0.3",
     "@refinedev/core": "^5.0.12",
     "active-win": "^8.2.0",
