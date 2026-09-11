@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
+import { useTimerStore } from '@/stores/timerStore';
 import { fetchMyProfile, switchTenantApi } from '@/services/ProfileApi.services';
 import styles from './Profile.module.css';
 
@@ -44,6 +45,16 @@ export function Profile() {
     const newTenantObj = userTenants.find((t: any) => t.id === newTenantId);
     
     if (!newTenantId || !accessToken || !newTenantObj) return;
+
+    if (useTimerStore.getState().isRunning) {
+      const confirmSwitch = window.confirm("Timer is currently running. Do you want to switch tenant? This will stop your current timer.");
+      if (!confirmSwitch) {
+        return; // User canceled
+      }
+      // Stop the timer
+      useTimerStore.getState().stopTimer();
+      useTimerStore.getState().reset();
+    }
     
     setIsSwitchingTenant(true);
     const loadingToast = toast.loading('Switching organization...');
@@ -55,10 +66,14 @@ export function Profile() {
       // 2. Update local auth session with new token and roles
       updateAuthSession(res.access_token, Object.keys(res.roles), newTenantObj.name);
       
-      // 3. Invalidate profile query to re-fetch the new profile for this tenant
-      await queryClient.invalidateQueries({ queryKey: ['profile'] });
+      // 3. Clear all queries so projects, tasks, etc. reload for the new tenant
+      queryClient.clear();
+      await queryClient.invalidateQueries();
       
       toast.success(`Switched to ${newTenantObj.name}`, { id: loadingToast });
+
+      // Navigate to dashboard to ensure fresh state
+      navigate('/');
     } catch (err: any) {
       console.error('Failed to switch tenant', err);
       toast.error(err.message || 'Failed to switch organization', { id: loadingToast });

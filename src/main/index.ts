@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, session } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, session, net } from 'electron';
 import * as path from 'path';
 import { logger } from './utils/logger';
 import { authStore } from './utils/authStore';
@@ -220,10 +220,10 @@ function registerIpcHandlers(): void {
         if (url.startsWith(redirectUri) && !isResolved) {
           isResolved = true;
           try {
-            // Wait for the cookie to be set (up to 2 seconds)
+            // Wait for the cookie to be set (up to 5 seconds)
             let refreshCookie;
             let allCookiesHeader = '';
-            for (let i = 0; i < 10; i++) {
+            for (let i = 0; i < 25; i++) {
               const cookies = await authWindow.webContents.session.cookies.get({});
               const refresh = cookies.find(c => c.name === 'axis_refresh');
               if (refresh) {
@@ -238,7 +238,8 @@ function registerIpcHandlers(): void {
             if (refreshCookie) {
               // Call Axis API to confirm access using the cookie
               const confirmUrl = urls.axisApiUrl.replace(/\/api\/?$/, '/api/v1') + '/auth/confirm-access';
-              const response = await fetch(confirmUrl, {
+              // Use Electron's net.fetch to use Chromium's network stack (respects OS cert store and proxies)
+              const response = await net.fetch(confirmUrl, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
