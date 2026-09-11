@@ -14,6 +14,8 @@ export const API_ENDPOINTS = {
   // The API uses @AuthenticationPrincipal (JWT) for userId — no query param needed.
   TIME_LOGS_START: (taskId: number) => `/tasks/${taskId}/time-logs/start`,
   TIME_LOGS_STOP: (taskId: number) => `/tasks/${taskId}/time-logs/end`,
+  TIME_LOGS_ACTIVE: '/tasks/time-logs/active',
+  TIME_LOGS: '/tasks/time-logs',
 
   // ── NOT IMPLEMENTED in PMS API ─────────────────────────────────
   // The following endpoints do not exist in the PMS API backend.

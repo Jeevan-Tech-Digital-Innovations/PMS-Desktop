@@ -7,7 +7,7 @@ import { useProjectStore } from '@/stores/projectStore';
 import { useUiStore } from '@/stores/uiStore';
 import { useStartTimeLog } from '@/hooks/useStartTimeLog';
 import { formatTime } from '@/utils/formatTime';
-import { stopTimeLog } from '../TimeTrackingApi.services';
+import { stopTimeLog, getPreviousSecondsTodayForTask } from '../TimeTrackingApi.services';
 import { stopBreak } from '@/services/BreakApi.services';
 import { getNotesForTask, updateNote, deleteNote } from '@/services/NoteApi.services';
 import styles from './TimeTracking.module.css';
@@ -153,17 +153,14 @@ export function TimeTracking() {
   // Resume timer UI if we arrive here with an active time log
   useEffect(() => {
     if (activeTimeLog && !isRunning) {
-      startTimer();
+      getPreviousSecondsTodayForTask(activeTimeLog.taskId).then((prevSec) => {
+        const diffSec = activeTimeLog.startTime
+          ? Math.max(0, Math.floor((Date.now() - new Date(activeTimeLog.startTime).getTime()) / 1000))
+          : 0;
+        startTimer(prevSec + diffSec);
+      });
     }
   }, [activeTimeLog, isRunning, startTimer]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      tick();
-      tickBreak();
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [tick, tickBreak]);
 
   const stopMutation = useMutation({
     mutationFn: () => stopTimeLog(activeTimeLog!.taskId),
@@ -200,6 +197,7 @@ export function TimeTracking() {
       try {
         await stopBreak(activeTimeLog.id);
         stopBreakTimer();
+        window.electronAPI?.stopBreak();
         toast.success('Break stopped');
       } catch (error: any) {
         toast.error(error.response?.data?.message || 'Failed to stop break');

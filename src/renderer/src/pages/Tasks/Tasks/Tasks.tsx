@@ -42,7 +42,6 @@ export function Tasks() {
   const setDraftTask = useProjectStore((s) => s.setDraftTask);
   const commitDraftSelection = useProjectStore((s) => s.commitDraftSelection);
   const clearDraftSelection = useProjectStore((s) => s.clearDraftSelection);
-  
   const userId = useAuthStore((s) => s.user?.userId);
   
   const [search, setSearch] = useState('');

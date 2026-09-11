@@ -59,3 +59,71 @@ export async function stopTimeLog(taskId: number) {
   );
   return data;
 }
+
+export async function getActiveTimeLog() {
+  try {
+    const { data } = await apiClient.get(API_ENDPOINTS.TIME_LOGS_ACTIVE);
+    return data || null;
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Calculates accumulated time logged today for a given task (in seconds).
+ * Mirrors the PMS UI Header logic: filters logs by taskId, where endTime is present
+ * and startTime is today.
+ */
+export async function getPreviousSecondsTodayForTask(
+  taskId: number | string,
+): Promise<number> {
+  if (!taskId) return 0;
+
+  try {
+    const userId = useAuthStore.getState().user?.userId;
+    let logs: any[] = [];
+
+    try {
+      const res = await apiClient.get(API_ENDPOINTS.TIME_LOGS);
+      logs = Array.isArray(res.data) ? res.data : res.data?.data || [];
+    } catch {
+      if (userId) {
+        try {
+          const res = await apiClient.get(`/employees/${userId}/time-logs`);
+          logs = Array.isArray(res.data) ? res.data : res.data?.data || [];
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    if (!Array.isArray(logs) || logs.length === 0) return 0;
+
+    const now = new Date();
+    const startOfToday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    ).getTime();
+
+    let previousSecondsToday = 0;
+    for (const log of logs) {
+      if (
+        String(log.taskId) === String(taskId) &&
+        log.endTime &&
+        log.startTime
+      ) {
+        const logStart = new Date(log.startTime).getTime();
+        const logEnd = new Date(log.endTime).getTime();
+        if (logStart >= startOfToday && logEnd > logStart) {
+          previousSecondsToday += Math.floor((logEnd - logStart) / 1000);
+        }
+      }
+    }
+
+    return previousSecondsToday;
+  } catch (err) {
+    console.error('Error calculating previous seconds for task:', err);
+    return 0;
+  }
+}
