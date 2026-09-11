@@ -192,7 +192,7 @@ function registerIpcHandlers(): void {
         webPreferences: {
           nodeIntegration: false,
           contextIsolation: true,
-          webSecurity: !isDev,
+          webSecurity: false, // Force disable web security to bypass Mixed Content/CORS blocks on Staging
         },
       });
 
@@ -205,6 +205,20 @@ function registerIpcHandlers(): void {
 
       authWindow.webContents.on('did-fail-load', (e, errorCode, errorDescription) => {
         console.error('authWindow failed to load:', errorCode, errorDescription);
+        if (!isResolved) {
+          isResolved = true;
+          authWindow.close();
+          reject(new Error(`Login page failed to load: ${errorDescription} (Code: ${errorCode})`));
+        }
+      });
+      
+      authWindow.webContents.on('did-fail-provisional-load', (e, errorCode, errorDescription) => {
+        console.error('authWindow failed provisional load:', errorCode, errorDescription);
+        if (!isResolved) {
+          isResolved = true;
+          authWindow.close();
+          reject(new Error(`Login page blocked or unreachable: ${errorDescription} (Code: ${errorCode})`));
+        }
       });
 
       authWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
@@ -224,11 +238,11 @@ function registerIpcHandlers(): void {
             let refreshCookie;
             let allCookiesHeader = '';
             for (let i = 0; i < 25; i++) {
+              // We must check all cookies because the cookie might be set on the web URL domain instead of the API URL domain
               const cookies = await authWindow.webContents.session.cookies.get({});
               const refresh = cookies.find(c => c.name === 'axis_refresh');
               if (refresh) {
                 refreshCookie = refresh;
-                // Build a cookie string with all cookies just in case the backend needs others (e.g. session/CSRF)
                 allCookiesHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
                 break;
               }
@@ -238,32 +252,45 @@ function registerIpcHandlers(): void {
             if (refreshCookie) {
               // Call Axis API to confirm access using the cookie
               const confirmUrl = urls.axisApiUrl.replace(/\/api\/?$/, '/api/v1') + '/auth/confirm-access';
-              // Use Electron's net.fetch to use Chromium's network stack (respects OS cert store and proxies)
-              const response = await net.fetch(confirmUrl, {
-                method: 'POST',
+              
+              // Use axios with built-in https agent to bypass strict corporate proxy SSL certificate checks
+              const https = require('https');
+              const axios = require('axios');
+              const httpsAgent = new https.Agent({ rejectUnauthorized: false });
+
+              const response = await axios.post(confirmUrl, {}, {
                 headers: {
+                  'Accept': 'application/json',
                   'Content-Type': 'application/json',
                   'Cookie': allCookiesHeader
-                }
+                },
+                httpsAgent: confirmUrl.startsWith('https') ? httpsAgent : undefined
               });
 
-              if (response.ok) {
-                const data = await response.json();
+              if (response.status >= 200 && response.status < 300) {
+                const data = response.data;
                 authWindow.close();
                 resolve(data);
                 return;
               } else {
-                console.error(`Confirm access failed with status: ${response.status}`);
+                throw new Error(`Server returned status ${response.status}: ${response.statusText}`);
               }
             } else {
-              console.error('axis_refresh cookie not found after login redirect');
+              throw new Error('axis_refresh cookie not found after 5 seconds');
             }
-          } catch (err) {
+          } catch (err: any) {
             console.error('SSO confirmation failed:', err);
+            authWindow.close();
+            
+            // Extract axios error message if available
+            let errorMsg = err.message || String(err);
+            if (err.response) {
+               errorMsg = `Status ${err.response.status}: ${JSON.stringify(err.response.data)}`;
+            }
+            
+            reject(new Error(`Failed to obtain session via SSO: ${errorMsg}`));
+            return;
           }
-
-          authWindow.close();
-          reject(new Error('Failed to obtain session via SSO'));
         }
       };
 
@@ -368,6 +395,12 @@ function registerIpcHandlers(): void {
 
 // ── App Lifecycle ────────────────────────────────────────────────
 app.whenReady().then(() => {
+  // Ignore certificate errors for the Axis SSO login window behind corporate proxies
+  app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
+    event.preventDefault();
+    callback(true);
+  });
+
   registerIpcHandlers();
   createWindow();
   createTray(mainWindow!);

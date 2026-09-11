@@ -49,7 +49,7 @@ export async function startTimeLog(taskId: number) {
     `${API_ENDPOINTS.TIME_LOGS_START(taskId)}?userId=${userId}`,
     activityPayload,
   );
-  return data;
+  return data?.data ? data.data : data;
 }
 
 export async function stopTimeLog(taskId: number) {
@@ -57,13 +57,13 @@ export async function stopTimeLog(taskId: number) {
   const { data } = await apiClient.put(
     `${API_ENDPOINTS.TIME_LOGS_STOP(taskId)}?userId=${userId}`,
   );
-  return data;
+  return data?.data ? data.data : data;
 }
 
 export async function getActiveTimeLog() {
   try {
     const { data } = await apiClient.get(API_ENDPOINTS.TIME_LOGS_ACTIVE);
-    return data || null;
+    return (data?.data ? data.data : data) || null;
   } catch (err) {
     return null;
   }
