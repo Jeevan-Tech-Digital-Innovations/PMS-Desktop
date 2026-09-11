@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useTimerStore } from '@/stores/timerStore';
 import { useProjectStore } from '@/stores/projectStore';
-import { startTimeLog } from '@/pages/TimeTracking/TimeTrackingApi.services';
+import { startTimeLog, getPreviousSecondsTodayForTask } from '@/pages/TimeTracking/TimeTrackingApi.services';
 
 export function useStartTimeLog() {
   const navigate = useNavigate();
@@ -12,9 +12,12 @@ export function useStartTimeLog() {
 
   const mutation = useMutation({
     mutationFn: (payload: { taskId: number }) => startTimeLog(payload.taskId),
-    onSuccess: (data) => {
+    onSuccess: async (data, variables) => {
       setActiveTimeLog(data);
-      startTimer();
+
+      const previousSecondsToday = await getPreviousSecondsTodayForTask(variables.taskId);
+      startTimer(previousSecondsToday);
+
       window.electronAPI?.startTimer({
         timeLogId: data.id,
         startTime: data.startTime,

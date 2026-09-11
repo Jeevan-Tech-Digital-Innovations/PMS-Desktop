@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { useEffect } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { useTimerStore } from '@/stores/timerStore';
+import { useTimerSync } from '@/hooks/useTimerSync';
 
 // Page imports
 import { Login } from '@/pages/Login';
@@ -36,6 +37,8 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   const navigate = useNavigate();
   const checkStoredTokens = useAuthStore((s) => s.checkStoredTokens);
+
+  useTimerSync();
 
   useEffect(() => {
     // Check for stored tokens on app start

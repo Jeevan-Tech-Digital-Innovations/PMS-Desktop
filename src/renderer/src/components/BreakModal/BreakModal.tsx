@@ -46,6 +46,7 @@ export function BreakModal() {
       setIsStarting(true);
       await startBreak(activeTimeLog.id, reasonId);
       startBreakTimer();
+      window.electronAPI?.startBreak();
       toast.success('Break started');
       closeBreakModal();
     } catch (error: any) {

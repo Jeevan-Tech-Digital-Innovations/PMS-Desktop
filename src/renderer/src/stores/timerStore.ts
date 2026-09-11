@@ -10,7 +10,8 @@ interface TimerState {
   startTime: string | null;
 
   // Actions
-  startTimer: () => void;
+  startTimer: (initialSeconds?: number) => void;
+  setWorkSeconds: (seconds: number) => void;
   stopTimer: () => void;
   tick: () => void;
   startIdle: (offsetSeconds: number) => void;
@@ -30,15 +31,20 @@ export const useTimerStore = create<TimerState>((set, get) => ({
   breakSeconds: 0,
   startTime: null,
 
-  startTimer: () =>
+  startTimer: (initialSeconds = 0) =>
     set({
       isRunning: true,
       isOnBreak: false,
       isIdle: false,
-      workSeconds: 0,
+      workSeconds: initialSeconds,
       idleSeconds: 0,
       breakSeconds: 0,
       startTime: new Date().toISOString(),
+    }),
+
+  setWorkSeconds: (seconds) =>
+    set({
+      workSeconds: seconds,
     }),
 
   stopTimer: () =>

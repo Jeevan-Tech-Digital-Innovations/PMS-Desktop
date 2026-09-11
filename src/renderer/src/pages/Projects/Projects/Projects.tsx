@@ -1,5 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { useProjectStore } from '@/stores/projectStore';
+import { useAuthStore } from '@/stores/authStore';
+import { fetchProjects } from '../ProjectsApi.services';
+import styles from './Projects.module.css';
+
 const MyRefreshComponent = ({ onClick, disabled }: any) => {
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -10,28 +16,22 @@ const MyRefreshComponent = ({ onClick, disabled }: any) => {
   };
 
   return (
-    <button 
-      onClick={handleClick} 
+    <button
+      onClick={handleClick}
       disabled={disabled}
-      style={{ 
-        marginLeft: 'auto', 
+      style={{
+        marginLeft: 'auto',
         cursor: disabled ? 'not-allowed' : 'pointer',
         background: 'none',
         border: 'none',
         fontSize: '18px',
-        opacity: disabled ? 0.5 : 1
+        opacity: disabled ? 0.5 : 1,
       }}
     >
       ↻
     </button>
   );
 };
-import { useQuery } from '@tanstack/react-query';
-import { useProjectStore } from '@/stores/projectStore';
-import { fetchProjects } from '../ProjectsApi.services';
-import styles from './Projects.module.css';
-
-import { useAuthStore } from '@/stores/authStore';
 
 export function Projects() {
   const navigate = useNavigate();

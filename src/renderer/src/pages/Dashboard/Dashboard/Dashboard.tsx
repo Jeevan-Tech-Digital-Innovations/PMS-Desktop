@@ -3,23 +3,34 @@ import { useNavigate } from 'react-router-dom';
 import { useTimerStore } from '@/stores/timerStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useStartTimeLog } from '@/hooks/useStartTimeLog';
+import { getPreviousSecondsTodayForTask } from '@/pages/TimeTracking/TimeTrackingApi.services';
 import { formatTime } from '@/utils/formatTime';
 import styles from './Dashboard.module.css';
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const { isRunning, workSeconds, idleSeconds, breakSeconds, isIdle, tick, tickBreak } = useTimerStore();
+  const { isRunning, workSeconds, idleSeconds, breakSeconds, isIdle } = useTimerStore();
   const selectedProject = useProjectStore((s) => s.selectedProject);
   const selectedTask = useProjectStore((s) => s.selectedTask);
   const startMutation = useStartTimeLog();
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      tick();
-      tickBreak();
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [tick, tickBreak]);
+    if (!isRunning) {
+      if (selectedTask?.id) {
+        let isCurrent = true;
+        getPreviousSecondsTodayForTask(selectedTask.id).then((prevSec) => {
+          if (isCurrent && !useTimerStore.getState().isRunning) {
+            useTimerStore.getState().setWorkSeconds(prevSec);
+          }
+        });
+        return () => {
+          isCurrent = false;
+        };
+      } else {
+        useTimerStore.getState().setWorkSeconds(0);
+      }
+    }
+  }, [selectedTask?.id, isRunning]);
 
   const getStatusText = () => {
     if (!isRunning) return 'Ready';
