@@ -6,6 +6,20 @@ import { useTimerStore } from '@/stores/timerStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { getActiveTimeLog, getPreviousSecondsTodayForTask } from '@/pages/TimeTracking/TimeTrackingApi.services';
 
+// Module-level timestamp — only set when the USER explicitly clicks Start locally.
+// The sync must NOT set this when it auto-starts from a web-detected timer.
+let lastLocalStartTime = 0;
+
+/**
+ * Call this from useStartTimeLog when the user explicitly clicks Start.
+ * This enables the grace period so the sync doesn't immediately kill
+ * the timer before the API confirms the new log.
+ */
+export function markLocalTimerStart() {
+  lastLocalStartTime = Date.now();
+  console.log('[TimerSync] Local timer start marked, grace period begins.');
+}
+
 export function useTimerSync() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -30,7 +44,7 @@ export function useTimerSync() {
     return () => clearInterval(tickInterval);
   }, [isAuthenticated, tick, tickBreak]);
 
-  // Periodic active timer sync with API (every 3 seconds)
+  // Periodic active timer sync with API (every 5 seconds)
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -40,7 +54,7 @@ export function useTimerSync() {
 
       try {
         const activeLog = await getActiveTimeLog();
-        const { isRunning, startTime } = useTimerStore.getState();
+        const { isRunning } = useTimerStore.getState();
         const activeTimeLog = useProjectStore.getState().activeTimeLog;
 
         if (activeLog && activeLog.id && !activeLog.endTime) {
@@ -61,7 +75,13 @@ export function useTimerSync() {
           }
 
           // An active log exists on the server (running or away)
-          if (!isRunning || !activeTimeLog || activeTimeLog.id !== activeLog.id) {
+          // Use String() comparison to avoid number vs string ID mismatch
+          const idMismatch =
+            !isRunning ||
+            !activeTimeLog ||
+            String(activeTimeLog.id) !== String(activeLog.id);
+
+          if (idMismatch) {
             console.log('[TimerSync] Active timer detected from web:', activeLog);
 
             // Populate project and task stores
@@ -156,7 +176,14 @@ export function useTimerSync() {
             }
           }
         } else {
-          // No active log on server
+          // No active log on server — respect the grace period after a LOCAL explicit Start.
+          // This does NOT fire when the sync auto-started the timer from a web detection.
+          const withinGrace = Date.now() - lastLocalStartTime < 12_000;
+          if (withinGrace) {
+            console.log('[TimerSync] No active log on server yet, within local start grace period. Skipping stop.');
+            return;
+          }
+
           if (isRunning || activeTimeLog !== null) {
             console.log('[TimerSync] Active timer stopped from web, stopping desktop timer');
 
@@ -180,10 +207,13 @@ export function useTimerSync() {
       }
     };
 
-    // Run initial sync immediately
-    syncActiveTimer();
-
-    const interval = setInterval(syncActiveTimer, 3000);
-    return () => clearInterval(interval);
+    // Delay initial sync by 5 seconds to avoid stomping on a fresh login/start
+    const initialTimeout = setTimeout(syncActiveTimer, 5000);
+    const interval = setInterval(syncActiveTimer, 5000);
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
   }, [isAuthenticated, location.pathname, navigate]);
 }
+

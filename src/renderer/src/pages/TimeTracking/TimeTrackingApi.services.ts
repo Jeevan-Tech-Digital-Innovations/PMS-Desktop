@@ -2,6 +2,7 @@ import { apiClient } from '@/services/apiClient';
 import { useAuthStore } from '@/stores/authStore';
 import { API_ENDPOINTS } from '@/utils/constants';
 
+
 /**
  * Builds the ActivityLogRequest payload that the PMS API expects
  * for the start-time-log endpoint.
@@ -61,18 +62,14 @@ export async function stopTimeLog(taskId: number) {
 }
 
 export async function getActiveTimeLog() {
-  try {
-    const { data } = await apiClient.get(API_ENDPOINTS.TIME_LOGS_ACTIVE);
-    return (data?.data ? data.data : data) || null;
-  } catch (err) {
-    return null;
-  }
+  const { data } = await apiClient.get(API_ENDPOINTS.TIME_LOGS_ACTIVE);
+  return (data?.data ? data.data : data) || null;
 }
 
 /**
  * Calculates accumulated time logged today for a given task (in seconds).
- * Mirrors the PMS UI Header logic: filters logs by taskId, where endTime is present
- * and startTime is today.
+ * Uses durationMinutes from each completed log as the primary source
+ * (already computed server-side), falling back to startTime/endTime arithmetic.
  */
 export async function getPreviousSecondsTodayForTask(
   taskId: number | string,
@@ -80,21 +77,13 @@ export async function getPreviousSecondsTodayForTask(
   if (!taskId) return 0;
 
   try {
-    const userId = useAuthStore.getState().user?.userId;
     let logs: any[] = [];
 
     try {
       const res = await apiClient.get(API_ENDPOINTS.TIME_LOGS);
       logs = Array.isArray(res.data) ? res.data : res.data?.data || [];
     } catch {
-      if (userId) {
-        try {
-          const res = await apiClient.get(`/employees/${userId}/time-logs`);
-          logs = Array.isArray(res.data) ? res.data : res.data?.data || [];
-        } catch {
-          // ignore
-        }
-      }
+      // ignore — will return 0
     }
 
     if (!Array.isArray(logs) || logs.length === 0) return 0;
@@ -108,15 +97,25 @@ export async function getPreviousSecondsTodayForTask(
 
     let previousSecondsToday = 0;
     for (const log of logs) {
+      // Only count completed logs (endTime present) for this task
       if (
         String(log.taskId) === String(taskId) &&
         log.endTime &&
         log.startTime
       ) {
+        // Verify the log is from today
         const logStart = new Date(log.startTime).getTime();
-        const logEnd = new Date(log.endTime).getTime();
-        if (logStart >= startOfToday && logEnd > logStart) {
-          previousSecondsToday += Math.floor((logEnd - logStart) / 1000);
+        if (logStart >= startOfToday) {
+          if (log.durationMinutes != null && log.durationMinutes > 0) {
+            // Use server-computed duration (most accurate)
+            previousSecondsToday += log.durationMinutes * 60;
+          } else {
+            // Fallback: compute from timestamps
+            const logEnd = new Date(log.endTime).getTime();
+            if (logEnd > logStart) {
+              previousSecondsToday += Math.floor((logEnd - logStart) / 1000);
+            }
+          }
         }
       }
     }
@@ -127,3 +126,4 @@ export async function getPreviousSecondsTodayForTask(
     return 0;
   }
 }
+

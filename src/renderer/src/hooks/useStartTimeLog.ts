@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { useTimerStore } from '@/stores/timerStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { startTimeLog, getPreviousSecondsTodayForTask } from '@/pages/TimeTracking/TimeTrackingApi.services';
+import { markLocalTimerStart } from '@/hooks/useTimerSync';
 
 export function useStartTimeLog() {
   const navigate = useNavigate();
@@ -14,6 +15,10 @@ export function useStartTimeLog() {
     mutationFn: (payload: { taskId: number }) => startTimeLog(payload.taskId),
     onSuccess: async (data, variables) => {
       setActiveTimeLog(data);
+
+      // Mark a local start so the sync grace period activates.
+      // Must be called BEFORE startTimer to cover the API propagation delay.
+      markLocalTimerStart();
 
       const previousSecondsToday = await getPreviousSecondsTodayForTask(variables.taskId);
       startTimer(previousSecondsToday);
