@@ -4,7 +4,7 @@ import { IPC } from '../utils/ipcChannels';
 import { getMainWindow } from '../index';
 
 const HEARTBEAT_INTERVAL_MS = Number(process.env.HEARTBEAT_INTERVAL_MS) || 300_000; // 5 min
-const API_BASE = process.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
 
 let heartbeatHandle: ReturnType<typeof setInterval> | null = null;
 let timeLogId: number | null = null;

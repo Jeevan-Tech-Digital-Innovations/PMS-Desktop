@@ -13,6 +13,9 @@ files:
   - '!{.eslintignore,.eslintrc.json,.prettierignore,.prettierrc,dev-app-update.yml,CHANGELOG.md}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 
+asarUnpack:
+  - 'node_modules/screenshot-desktop/**/*'
+
 extraResources:
   - from: resources/icon.png
     to: icon.png
