@@ -6,6 +6,9 @@ export function Settings() {
 
   return (
     <div className={styles.container}>
+      <button className={styles.backBtn} onClick={() => window.history.back()}>
+        ← Back
+      </button>
       <h2 className={styles.title}>Settings</h2>
 
       <div className={styles.section}>
