@@ -57,9 +57,7 @@ export function ProfileMenu() {
             <button className={styles.menuItem} onClick={() => handleNavigate('/profile')}>
               My Profile
             </button>
-            <button className={styles.menuItem} onClick={() => handleNavigate('/dashboard')}>
-              Dashboard
-            </button>
+
             <button className={styles.menuItem} onClick={() => handleNavigate('/settings')}>
               Settings
             </button>
