@@ -39,7 +39,7 @@ export function useTimerSync() {
         tick();
         tickBreak();
         
-        if (state.workSeconds + 1 === 15 && !state.isOvertime) {
+        if (state.workSeconds + 1 === 28800 && !state.isOvertime) {
           setTimeout(async () => {
             const isOT = window.confirm('Your timer has reached 8 hours. Do you want to continue as overtime?');
             const activeLog = useProjectStore.getState().activeTimeLog;
@@ -69,8 +69,8 @@ export function useTimerSync() {
           }, 0);
         }
 
-        // Forgotten Timer Protection: 30 seconds IDLE auto-stop
-        if (state.isIdle && state.idleSeconds === 30) {
+        // Forgotten Timer Protection: 1 hour (3600 seconds) IDLE auto-stop
+        if (state.isIdle && state.idleSeconds === 3600) {
           setTimeout(async () => {
             const shouldContinue = window.confirm('Forgotten Timer Warning: You have been idle for a long time. Click OK to continue the timer, or Cancel to stop it.');
             if (shouldContinue) {
