@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useProjectStore } from '@/stores/projectStore';
 import { useAuthStore } from '@/stores/authStore';
 import { fetchProjects } from '../ProjectsApi.services';
@@ -38,11 +38,25 @@ export function Projects() {
   const userId = useAuthStore((s) => s.user?.userId);
   const setDraftProject = useProjectStore((s) => s.setDraftProject);
   const [search, setSearch] = useState('');
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const queryClient = useQueryClient();
+
+  const queryKey = ['projects', search, userId];
 
   const { data: projects = [], isLoading, refetch, isRefetching } = useQuery({
-    queryKey: ['projects', search, userId],
+    queryKey,
     queryFn: () => fetchProjects(search, userId),
   });
+
+  const handleRefresh = async () => {
+    setIsManualRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey });
+      await refetch();
+    } finally {
+      setIsManualRefreshing(false);
+    }
+  };
 
   const handleSelect = (project: any) => {
     setDraftProject(project);
@@ -56,7 +70,7 @@ export function Projects() {
           ← Back
         </button>
         <h2 className={styles.title}>Select Project</h2>
-        <MyRefreshComponent onClick={() => refetch()} disabled={isRefetching} />
+        <MyRefreshComponent onClick={handleRefresh} disabled={isRefetching || isManualRefreshing} />
       </div>
 
       <input

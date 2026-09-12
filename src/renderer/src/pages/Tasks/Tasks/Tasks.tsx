@@ -1,158 +1,153 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-const MyRefreshComponent = ({ onClick, disabled }: any) => {
-  const handleClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (onClick && !disabled) {
-      onClick();
-    }
-  };
-
-  return (
-    <button 
-      onClick={handleClick} 
-      disabled={disabled}
-      style={{ 
-        marginLeft: 'auto', 
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        background: 'none',
-        border: 'none',
-        fontSize: '18px',
-        opacity: disabled ? 0.5 : 1
-      }}
-    >
-      ↻
-    </button>
-  );
-};
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useProjectStore } from '@/stores/projectStore';
-import { fetchTasks, fetchSubTasks } from '../TasksApi.services';
-import { Task } from '@/types/task';
-import styles from './Tasks.module.css';
 import { useAuthStore } from '@/stores/authStore';
+import { fetchAssignedItems, AssignedItem } from '../TasksApi.services';
+import styles from './Tasks.module.css';
 
+// ─── Refresh button ───────────────────────────────────────────────────────────
+const RefreshButton = ({ onClick, disabled }: { onClick: () => void; disabled: boolean }) => (
+  <button
+    onClick={(e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!disabled) onClick();
+    }}
+    disabled={disabled}
+    className={styles.refreshBtn}
+    title="Refresh"
+  >
+    ↻
+  </button>
+);
+
+// ─── Task / Subtask card ──────────────────────────────────────────────────────
+interface ItemCardProps {
+  item: AssignedItem;
+  isSelected: boolean;
+  onSelect: (item: AssignedItem) => void;
+}
+
+const ItemCard = ({ item, isSelected, onSelect }: ItemCardProps) => (
+  <button
+    className={`${styles.card} ${isSelected ? styles.selected : ''} ${item.itemType === 'subtask' ? styles.subtaskCard : ''}`}
+    onClick={() => onSelect(item)}
+    title="Select & Start"
+  >
+    <div className={styles.cardTop}>
+      <span className={styles.name}>{item.title}</span>
+      {item.itemType === 'subtask' && (
+        <span className={styles.subtaskBadge}>Subtask</span>
+      )}
+    </div>
+    <span className={styles.meta}>
+      {item.status}
+      {item.priority && ` · ${item.priority}`}
+    </span>
+  </button>
+);
+
+// ─── Main Tasks page ──────────────────────────────────────────────────────────
 export function Tasks() {
   const navigate = useNavigate();
   const { projectId } = useParams<{ projectId: string }>();
+
   const selectedProject = useProjectStore((s) => s.selectedProject);
-  const draftProject = useProjectStore((s) => s.draftProject);
-  const selectedTask = useProjectStore((s) => s.selectedTask);
-  const setDraftTask = useProjectStore((s) => s.setDraftTask);
+  const draftProject    = useProjectStore((s) => s.draftProject);
+  const selectedTask    = useProjectStore((s) => s.selectedTask);
+  const setDraftTask    = useProjectStore((s) => s.setDraftTask);
   const commitDraftSelection = useProjectStore((s) => s.commitDraftSelection);
-  const clearDraftSelection = useProjectStore((s) => s.clearDraftSelection);
+  const clearDraftSelection  = useProjectStore((s) => s.clearDraftSelection);
   const userId = useAuthStore((s) => s.user?.userId);
-  
+
   const [search, setSearch] = useState('');
-  const [parentStack, setParentStack] = useState<Task[]>([]);
-  const currentParent = parentStack.length > 0 ? parentStack[parentStack.length - 1] : null;
-
-  const { data: tasks = [], isLoading, refetch: refetchTasks, isRefetching: isRefetchingTasks } = useQuery({
-    queryKey: ['tasks', projectId, userId],
-    queryFn: () => fetchTasks(Number(projectId), search, userId),
-    enabled: !!projectId && parentStack.length === 0,
-  });
-
-  const { data: subTasks = [], isLoading: isSubTasksLoading, refetch: refetchSubTasks, isRefetching: isRefetchingSubTasks } = useQuery({
-    queryKey: ['subTasks', currentParent?.id, userId],
-    queryFn: () => fetchSubTasks(Number(currentParent?.id), search, userId),
-    enabled: !!currentParent?.id,
-  });
-
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const activeProject = draftProject || selectedProject;
+  const queryClient = useQueryClient();
 
-  const handleSelect = (task: Task) => {
-    setDraftTask(task);
+  const queryKey = ['assignedItems', projectId, userId];
+
+  const { data: items = [], isLoading, refetch, isRefetching } = useQuery({
+    queryKey,
+    queryFn: () => fetchAssignedItems(Number(projectId), userId),
+    enabled: !!projectId,
+  });
+
+  const handleRefresh = async () => {
+    setIsManualRefreshing(true);
+    try {
+      // Invalidate cache first so staleTime doesn't block the network call
+      await queryClient.invalidateQueries({ queryKey });
+      await refetch();
+    } finally {
+      setIsManualRefreshing(false);
+    }
+  };
+
+  const taskCount    = items.filter((i) => i.itemType === 'task').length;
+  const subtaskCount = items.filter((i) => i.itemType === 'subtask').length;
+
+  const displayedList = useMemo(() => {
+    if (!search.trim()) return items;
+    const q = search.toLowerCase();
+    return items.filter((i) => i.title.toLowerCase().includes(q));
+  }, [items, search]);
+
+  const handleSelect = (item: AssignedItem) => {
+    setDraftTask(item);
     commitDraftSelection();
     navigate('/dashboard');
   };
 
-  const handleNavigate = (e: React.MouseEvent, task: Task) => {
-    e.stopPropagation();
-    setParentStack([...parentStack, task]);
-    setSearch('');
-  };
-
-  const handleBack = () => {
-    if (parentStack.length > 0) {
-      const newStack = [...parentStack];
-      newStack.pop();
-      setParentStack(newStack);
-      setSearch('');
-    } else {
-      clearDraftSelection();
-      navigate('/projects');
-    }
-  };
-
-  const displayedList = useMemo(() => {
-    const list = currentParent ? subTasks : tasks;
-    if (!search.trim()) return list;
-    return list.filter(t => t.title.toLowerCase().includes(search.toLowerCase()));
-  }, [tasks, subTasks, currentParent, search]);
-
-  const currentlyLoading = isLoading || (currentParent && isSubTasksLoading);
-  const isRefetching = isRefetchingTasks || isRefetchingSubTasks;
-
-  const handleRefresh = () => {
-    if (currentParent) {
-      refetchSubTasks();
-    } else {
-      refetchTasks();
-    }
-  };
-
   return (
     <div className={styles.container}>
+      {/* Header */}
       <div className={styles.header}>
-        <button className={styles.backBtn} onClick={handleBack}>
+        <button
+          className={styles.backBtn}
+          onClick={() => { clearDraftSelection(); navigate('/projects'); }}
+        >
           ← Back
         </button>
-        <h2 className={styles.title}>
-          {currentParent 
-            ? currentParent.title
-            : activeProject?.name || 'Select Task'}
-        </h2>
-        <MyRefreshComponent onClick={handleRefresh} disabled={isRefetching} />
+        <h2 className={styles.title}>{activeProject?.name || 'My Tasks'}</h2>
+        <RefreshButton onClick={handleRefresh} disabled={isRefetching || isManualRefreshing} />
       </div>
 
+      {/* Search */}
       <input
         className={styles.search}
         type="text"
-        placeholder={currentParent ? "Search sub-tasks..." : "Search tasks..."}
+        placeholder="Search tasks & subtasks..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
 
+      {/* Count summary */}
+      {!isLoading && items.length > 0 && (
+        <div className={styles.summary}>
+          {taskCount > 0 && <span>{taskCount} task{taskCount !== 1 ? 's' : ''}</span>}
+          {taskCount > 0 && subtaskCount > 0 && <span className={styles.dot}>·</span>}
+          {subtaskCount > 0 && <span>{subtaskCount} subtask{subtaskCount !== 1 ? 's' : ''}</span>}
+        </div>
+      )}
+
+      {/* List */}
       <div className={styles.list}>
-        {currentlyLoading ? (
-          <p className={styles.loading}>Loading tasks...</p>
+        {isLoading ? (
+          <p className={styles.loading}>Loading your tasks...</p>
         ) : displayedList.length === 0 ? (
           <p className={styles.empty}>
-            {currentParent ? 'No sub-tasks found' : 'No tasks found'}
+            {search ? 'No matching tasks found' : 'No tasks assigned to you in this project'}
           </p>
         ) : (
-          displayedList.map((task: Task) => (
-            <div key={task.id} className={styles.taskRow}>
-              <button
-                className={`${styles.card} ${selectedTask?.id === task.id ? styles.selected : ''}`}
-                onClick={() => handleSelect(task)}
-                title="Select & Start Task"
-              >
-                <span className={styles.name}>{task.title}</span>
-                <span className={styles.meta}>
-                  {task.status} · {task.priority}
-                </span>
-              </button>
-              <button
-                className={styles.navigateBtn}
-                onClick={(e) => handleNavigate(e, task)}
-                title="View Sub-tasks"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-              </button>
-            </div>
+          displayedList.map((item) => (
+            <ItemCard
+              key={`${item.itemType}-${item.id}`}
+              item={item}
+              isSelected={selectedTask?.id === item.id}
+              onSelect={handleSelect}
+            />
           ))
         )}
       </div>
