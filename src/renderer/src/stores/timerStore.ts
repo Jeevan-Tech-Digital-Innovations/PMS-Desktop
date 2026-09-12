@@ -7,6 +7,7 @@ interface TimerState {
   workSeconds: number;
   idleSeconds: number;
   breakSeconds: number;
+  activeBreakLimit: number | null;
   startTime: string | null;
   isOvertime: boolean;
 
@@ -17,7 +18,7 @@ interface TimerState {
   tick: () => void;
   startIdle: (offsetSeconds: number) => void;
   stopIdle: () => void;
-  startBreak: () => void;
+  startBreak: (reasonText?: string) => void;
   stopBreak: () => void;
   tickBreak: () => void;
   setOvertime: (isOvertime: boolean) => void;
@@ -31,6 +32,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
   workSeconds: 0,
   idleSeconds: 0,
   breakSeconds: 0,
+  activeBreakLimit: null,
   startTime: null,
   isOvertime: false,
 
@@ -42,6 +44,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       workSeconds: initialSeconds,
       idleSeconds: 0,
       breakSeconds: 0,
+      activeBreakLimit: null,
       startTime: new Date().toISOString(),
       isOvertime: false,
     }),
@@ -57,6 +60,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       isOnBreak: false,
       isIdle: false,
       isOvertime: false,
+      activeBreakLimit: null,
     }),
 
   tick: () => {
@@ -77,15 +81,26 @@ export const useTimerStore = create<TimerState>((set, get) => ({
 
   stopIdle: () => set({ isIdle: false }),
 
-  startBreak: () =>
+  startBreak: (reasonText = '') => {
+    let limit = null;
+    const lowerReason = reasonText.toLowerCase();
+    if (lowerReason.includes('tea')) {
+      limit = 15 * 60; // 15 mins
+    } else if (lowerReason.includes('lunch')) {
+      limit = 30 * 60; // 30 mins
+    }
+    
     set({
       isOnBreak: true,
       breakSeconds: 0,
-    }),
+      activeBreakLimit: limit,
+    });
+  },
 
   stopBreak: () =>
     set({
       isOnBreak: false,
+      activeBreakLimit: null,
     }),
 
   tickBreak: () => {
@@ -105,6 +120,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       workSeconds: 0,
       idleSeconds: 0,
       breakSeconds: 0,
+      activeBreakLimit: null,
       startTime: null,
       isOvertime: false,
     }),

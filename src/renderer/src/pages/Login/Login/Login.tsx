@@ -30,6 +30,10 @@ export default function Login() {
           .filter(Boolean)
           .join(' ') || userData.name || userData.email || 'User';
 
+        const tenants = authData.memberships ? authData.memberships.map((m: any) => ({ id: m.tenant_id, name: m.tenant_name })) : [];
+        const activeTenantId = authData.active_tenant_id || authData.data?.active_tenant_id;
+        const activeTenantName = tenants.find((t: any) => t.id === activeTenantId)?.name || (tenants.length > 0 ? tenants[0].name : undefined);
+
         const user = {
           // Axis returns user.id as a string (UUID), so we might need to cast or adapt it depending on the store's strictness
           userId: userData.id || 1, 
@@ -38,7 +42,8 @@ export default function Login() {
           email: userData.email || 'user@example.com',
           empNo: userData.empNo || 'EMP001',
           roles: authData.roles ? Object.keys(authData.roles) : [],
-          tenants: authData.memberships ? authData.memberships.map((m: any) => ({ id: m.tenant_id, name: m.tenant_name })) : []
+          tenants,
+          tenantName: activeTenantName
         };
         
         setAuth({

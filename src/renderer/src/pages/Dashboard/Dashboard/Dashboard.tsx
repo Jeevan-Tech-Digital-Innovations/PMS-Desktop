@@ -9,7 +9,7 @@ import styles from './Dashboard.module.css';
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const { isRunning, workSeconds, idleSeconds, breakSeconds, isIdle } = useTimerStore();
+  const { isRunning, workSeconds, idleSeconds, breakSeconds, isIdle, activeBreakLimit, isOnBreak } = useTimerStore();
   const selectedProject = useProjectStore((s) => s.selectedProject);
   const selectedTask = useProjectStore((s) => s.selectedTask);
   const startMutation = useStartTimeLog();
@@ -67,8 +67,12 @@ export function Dashboard() {
             </span>
           </div>
           <div className={styles.counter}>
-            <span className={styles.counterLabel}>Break Time</span>
-            <span className={styles.counterValue}>{formatTime(breakSeconds)}</span>
+            <span className={styles.counterLabel}>
+              Break Time {isOnBreak && activeBreakLimit && breakSeconds > activeBreakLimit ? '(Exceeded)' : ''}
+            </span>
+            <span className={`${styles.counterValue} ${isOnBreak && activeBreakLimit && breakSeconds > activeBreakLimit ? styles.breakExceeded : ''}`}>
+              {formatTime(breakSeconds)}
+            </span>
           </div>
         </div>
       </div>

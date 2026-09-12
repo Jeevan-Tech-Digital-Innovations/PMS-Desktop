@@ -91,6 +91,7 @@ export function TimeTracking() {
     workSeconds,
     idleSeconds,
     breakSeconds,
+    activeBreakLimit,
     isOnBreak,
     isIdle,
     startTimer,
@@ -265,8 +266,12 @@ export function TimeTracking() {
             </span>
           </div>
           <div className={styles.counter}>
-            <span className={styles.counterLabel}>Break</span>
-            <span className={styles.counterValue}>{formatTime(breakSeconds)}</span>
+            <span className={styles.counterLabel}>
+              Break {isOnBreak && activeBreakLimit && breakSeconds > activeBreakLimit ? '(Exceeded)' : ''}
+            </span>
+            <span className={`${styles.counterValue} ${isOnBreak && activeBreakLimit && breakSeconds > activeBreakLimit ? styles.breakExceeded : ''}`}>
+              {formatTime(breakSeconds)}
+            </span>
           </div>
         </div>
       </div>

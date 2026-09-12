@@ -44,8 +44,9 @@ export function BreakModal() {
 
     try {
       setIsStarting(true);
+      const selectedReason = reasons.find(r => r.id === reasonId);
       await startBreak(activeTimeLog.id, reasonId);
-      startBreakTimer();
+      startBreakTimer(selectedReason?.reasonText);
       window.electronAPI?.startBreak();
       toast.success('Break started');
       closeBreakModal();
