@@ -81,21 +81,13 @@ async function syncHeartbeat(): Promise<void> {
   });
   logger.debug(`Heartbeat (local only): ${elapsedMinutes}min elapsed for timeLogId ${timeLogId}`);
 
-  /* ── Disabled: endpoint does not exist in PMS API ────────────────
-  const payload: HeartbeatPayload = {
-    timeLogId,
-    startTime,
-    currentDurationMinutes: elapsedMinutes,
-  };
-
   try {
     const response = await fetch(`${API_BASE}/tasks/time-logs/${timeLogId}/heartbeat`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(payload),
+      }
     });
 
     if (response.ok) {
@@ -106,7 +98,6 @@ async function syncHeartbeat(): Promise<void> {
   } catch (error) {
     logger.error('Heartbeat network error', error);
   }
-  ──────────────────────────────────────────────────────────────── */
 }
 
 /**

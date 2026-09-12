@@ -46,21 +46,32 @@ export async function fetchAssignedItems(
   // 3. Collect subtasks: from list + fetch for each top-level task
   const allSubTasks: any[] = [...subTasksFromList];
 
-  // Fetch subtasks for each top-level task if not already in list
-  const topLevelIds = new Set(topLevel.map((t: any) => String(t.id)));
-  const fetchedIds = new Set(subTasksFromList.map((s: any) => String(s.parentTaskId)));
-
+  // Fetch subtasks for each top-level task unconditionally to ensure we don't miss any
+  // due to pagination or backend filtering on the main PROJECT_TASKS endpoint.
   for (const task of topLevel) {
-    if (!fetchedIds.has(String(task.id))) {
-      try {
-        const subRes = await apiClient.get<Task[]>(API_ENDPOINTS.SUB_TASKS(task.id));
-        const subData: any[] = Array.isArray(subRes.data)
-          ? subRes.data
-          : (subRes.data as any).content || [];
-        allSubTasks.push(...subData);
-      } catch {
-        // ignore
+    try {
+      const subRes = await apiClient.get<Task[]>(API_ENDPOINTS.SUB_TASKS(task.id));
+      const subData: any[] = Array.isArray(subRes.data)
+        ? subRes.data
+        : (subRes.data as any).content || [];
+      
+      // Only push if not already in allSubTasks
+      for (const s of subData) {
+        if (!allSubTasks.some(existing => String(existing.id) === String(s.id))) {
+          allSubTasks.push(s);
+        }
       }
+      
+      // Also extract subtasks that might be nested inside taskList
+      if (Array.isArray((task as any).taskList)) {
+        for (const s of (task as any).taskList) {
+          if (!allSubTasks.some(existing => String(existing.id) === String(s.id))) {
+            allSubTasks.push(s);
+          }
+        }
+      }
+    } catch {
+      // ignore
     }
   }
 

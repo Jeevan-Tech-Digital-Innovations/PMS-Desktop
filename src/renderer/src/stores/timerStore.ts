@@ -8,6 +8,7 @@ interface TimerState {
   idleSeconds: number;
   breakSeconds: number;
   startTime: string | null;
+  isOvertime: boolean;
 
   // Actions
   startTimer: (initialSeconds?: number) => void;
@@ -19,6 +20,7 @@ interface TimerState {
   startBreak: () => void;
   stopBreak: () => void;
   tickBreak: () => void;
+  setOvertime: (isOvertime: boolean) => void;
   reset: () => void;
 }
 
@@ -30,6 +32,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
   idleSeconds: 0,
   breakSeconds: 0,
   startTime: null,
+  isOvertime: false,
 
   startTimer: (initialSeconds = 0) =>
     set({
@@ -40,6 +43,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       idleSeconds: 0,
       breakSeconds: 0,
       startTime: new Date().toISOString(),
+      isOvertime: false,
     }),
 
   setWorkSeconds: (seconds) =>
@@ -52,6 +56,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       isRunning: false,
       isOnBreak: false,
       isIdle: false,
+      isOvertime: false,
     }),
 
   tick: () => {
@@ -90,6 +95,8 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     }
   },
 
+  setOvertime: (isOvertime) => set({ isOvertime }),
+
   reset: () =>
     set({
       isRunning: false,
@@ -99,5 +106,6 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       idleSeconds: 0,
       breakSeconds: 0,
       startTime: null,
+      isOvertime: false,
     }),
 }));

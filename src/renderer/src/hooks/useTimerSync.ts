@@ -34,10 +34,65 @@ export function useTimerSync() {
     if (!isAuthenticated) return;
 
     const tickInterval = setInterval(() => {
-      const isRunning = useTimerStore.getState().isRunning;
-      if (isRunning) {
+      const state = useTimerStore.getState();
+      if (state.isRunning) {
         tick();
         tickBreak();
+        
+        if (state.workSeconds + 1 === 15 && !state.isOvertime) {
+          setTimeout(async () => {
+            const isOT = window.confirm('Your timer has reached 8 hours. Do you want to continue as overtime?');
+            const activeLog = useProjectStore.getState().activeTimeLog;
+            if (isOT) {
+              try {
+                if (activeLog?.id) {
+                  const { transitionTimerState } = await import('@/pages/TimeTracking/TimeTrackingApi.services');
+                  await transitionTimerState(activeLog.projectTask?.id || activeLog.taskId, 'OVERTIME');
+                }
+                useTimerStore.getState().setOvertime(true);
+              } catch (e) {
+                console.error(e);
+              }
+            } else {
+              try {
+                if (activeLog?.id) {
+                  const { stopTimeLog } = await import('@/pages/TimeTracking/TimeTrackingApi.services');
+                  await stopTimeLog(activeLog.id);
+                }
+                useTimerStore.getState().stopTimer();
+                useProjectStore.getState().setActiveTimeLog(null);
+                window.electronAPI?.stopTimer();
+              } catch (e) {
+                console.error(e);
+              }
+            }
+          }, 0);
+        }
+
+        // Forgotten Timer Protection: 30 seconds IDLE auto-stop
+        if (state.isIdle && state.idleSeconds === 30) {
+          setTimeout(async () => {
+            const shouldContinue = window.confirm('Forgotten Timer Warning: You have been idle for a long time. Click OK to continue the timer, or Cancel to stop it.');
+            if (shouldContinue) {
+              // Reset idle logic or just let the main process know? 
+              // The main process handles idle state, but we can reset our local store.
+              // We just let them click it and they will be active again shortly.
+            } else {
+              const activeLog = useProjectStore.getState().activeTimeLog;
+              try {
+                if (activeLog?.id) {
+                  const { stopTimeLog } = await import('@/pages/TimeTracking/TimeTrackingApi.services');
+                  await stopTimeLog(activeLog.id);
+                }
+                useTimerStore.getState().stopTimer();
+                useProjectStore.getState().setActiveTimeLog(null);
+                window.electronAPI?.stopTimer();
+              } catch (e) {
+                console.error(e);
+              }
+            }
+          }, 0);
+        }
       }
     }, 1000);
 
@@ -107,17 +162,12 @@ export function useTimerSync() {
             // Fetch accumulated seconds already logged today for this task
             const previousSecondsToday = await getPreviousSecondsTodayForTask(activeLog.taskId);
 
-            // Calculate current session elapsed seconds
-            let currentSessionElapsed = 0;
-            if (activeLog.startTime) {
-              const startMs = new Date(activeLog.startTime).getTime();
-              if (!isNaN(startMs)) {
-                currentSessionElapsed = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
-              }
-            }
+            // Use backend calculated duration
+            let currentSessionElapsed = (activeLog.durationMinutes || 0) * 60;
 
             const totalInitialSeconds = previousSecondsToday + currentSessionElapsed;
             const isAway = activeLog.timeType === 'AWAY' || activeLog.timeType === 'BREAK';
+            const isOvertime = activeLog.timeType === 'OVERTIME';
 
             // Start desktop timer store resuming from total seconds today
             useTimerStore.setState({
@@ -128,6 +178,7 @@ export function useTimerSync() {
               idleSeconds: 0,
               breakSeconds: 0,
               startTime: activeLog.startTime,
+              isOvertime,
             });
 
             // Start background electron processes

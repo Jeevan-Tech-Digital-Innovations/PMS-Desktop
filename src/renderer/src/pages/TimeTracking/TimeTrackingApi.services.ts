@@ -127,3 +127,13 @@ export async function getPreviousSecondsTodayForTask(
   }
 }
 
+export async function transitionTimerState(taskId: number, newState: string, effectiveTime?: string) {
+  const url = API_ENDPOINTS.TIME_LOGS_TRANSITION(taskId);
+  const payload = {
+    newState,
+    effectiveTime: effectiveTime || new Date().toISOString()
+  };
+  const response = await apiClient.post(url, payload);
+  return response.data;
+}
+

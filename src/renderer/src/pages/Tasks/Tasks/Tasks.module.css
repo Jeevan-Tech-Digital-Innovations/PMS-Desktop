@@ -121,15 +121,13 @@
   background: #e6f4ff;
 }
 
-/* Subtask card — slightly different background to distinguish */
+/* Subtask card — uses standard white background now */
 .card.subtaskCard {
-  background: #f8faff;
-  border-color: #dde5f5;
+  background: #ffffff;
 }
 
-.card.subtaskCard:hover {
-  background: #eef3ff;
-  border-color: #91caff;
+.card.subtaskCard .name {
+  color: #1677ff;
 }
 
 .card.subtaskCard.selected {
@@ -158,9 +156,9 @@
 /* ─── Subtask badge ──────────────────────────────────────────── */
 .subtaskBadge {
   flex-shrink: 0;
-  background: #eff2ff;
-  color: #4361ee;
-  border: 1px solid #c5cffa;
+  background: #e6f4ff;
+  color: #1677ff;
+  border: 1px solid #91caff;
   border-radius: 4px;
   padding: 1px 6px;
   font-size: 0.65rem;
