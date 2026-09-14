@@ -234,19 +234,40 @@ function registerIpcHandlers(): void {
         if (url.startsWith(redirectUri) && !isResolved) {
           isResolved = true;
           try {
+            const parsedUrl = new URL(url);
+            const urlRefreshToken = parsedUrl.searchParams.get('refresh_token') || parsedUrl.searchParams.get('refreshToken');
+            const urlAccessToken = parsedUrl.searchParams.get('access_token') || parsedUrl.searchParams.get('accessToken');
+
+            if (urlRefreshToken && urlAccessToken) {
+              authWindow.close();
+              resolve({
+                access_token: urlAccessToken,
+                refresh_token: urlRefreshToken,
+                user: { email: parsedUrl.searchParams.get('email') || '' } // Basic mock if passed in URL
+              });
+              return;
+            }
+
             // Wait for the cookie to be set (up to 5 seconds)
             let refreshCookie;
             let allCookiesHeader = '';
+            let foundCookieNames: string[] = [];
             for (let i = 0; i < 25; i++) {
               // We must check all cookies because the cookie might be set on the web URL domain instead of the API URL domain
               const cookies = await authWindow.webContents.session.cookies.get({});
-              const refresh = cookies.find(c => c.name === 'axis_refresh');
+              foundCookieNames = cookies.map(c => c.name);
+              const refresh = cookies.find(c => c.name === 'axis_refresh_staging');
               if (refresh) {
                 refreshCookie = refresh;
-                allCookiesHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+                // Force alias the cookie to 'axis_refresh' so the API can read it
+                let cookiesToSend = cookies.map(c => `${c.name}=${c.value}`);
+                if (refresh.name !== 'axis_refresh') {
+                  cookiesToSend.push(`axis_refresh=${refresh.value}`);
+                }
+                allCookiesHeader = cookiesToSend.join('; ');
                 break;
               }
-              await new Promise(resolve => setTimeout(resolve, 200));
+              await new Promise(r => setTimeout(r, 200));
             }
 
             if (refreshCookie) {
@@ -276,7 +297,7 @@ function registerIpcHandlers(): void {
                 throw new Error(`Server returned status ${response.status}: ${response.statusText}`);
               }
             } else {
-              throw new Error('axis_refresh cookie not found after 5 seconds');
+              throw new Error(`axis_refresh cookie not found after 5s. Found cookies: ${foundCookieNames.join(', ')}`);
             }
           } catch (err: any) {
             console.error('SSO confirmation failed:', err);
@@ -320,9 +341,9 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.AUTH_REFRESH_SESSION, async (_, urls: { axisApiUrl: string }) => {
     try {
       const domain = new URL(urls.axisApiUrl).hostname;
-      // Use default session to find the axis_refresh cookie
+      // Use default session to find the refresh cookie
       const cookies = await session.defaultSession.cookies.get({ domain });
-      const refreshCookie = cookies.find(c => c.name === 'axis_refresh');
+      const refreshCookie = cookies.find(c => c.name === 'axis_refresh_staging');
 
       if (!refreshCookie) {
         throw new Error('No refresh cookie found');
@@ -333,7 +354,7 @@ function registerIpcHandlers(): void {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Cookie': `${refreshCookie.name}=${refreshCookie.value}`
+          'Cookie': `axis_refresh=${refreshCookie.value}`
         }
       });
 

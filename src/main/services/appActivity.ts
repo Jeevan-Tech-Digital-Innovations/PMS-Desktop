@@ -2,7 +2,7 @@ import { logger } from '../utils/logger';
 import { authStore } from '../utils/authStore';
 import { ActiveWindowInfo } from './activeWindow';
 
-const API_BASE = process.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
 const FLUSH_INTERVAL_MS = 60_000; // 1 minute
 
 interface AppActivityEvent {
