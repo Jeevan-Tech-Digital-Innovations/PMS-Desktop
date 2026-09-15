@@ -263,9 +263,18 @@ export function useTimerSync() {
     // Delay initial sync by 5 seconds to avoid stomping on a fresh login/start
     const initialTimeout = setTimeout(syncActiveTimer, 5000);
     const interval = setInterval(syncActiveTimer, 5000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncActiveTimer();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       clearTimeout(initialTimeout);
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [isAuthenticated, location.pathname, navigate]);
 }
