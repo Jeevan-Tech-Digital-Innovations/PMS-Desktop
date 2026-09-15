@@ -33,7 +33,7 @@ let mainWindow: BrowserWindow | null = null;
 let screenshotInterval: ReturnType<typeof setInterval> | null = null;
 let currentActiveWindowTitle = '';
 
-const SCREENSHOT_INTERVAL_MS = 10_000; // 10 seconds
+const SCREENSHOT_INTERVAL_MS = 600_000; // 10 minutes
 
 /**
  * Returns the main BrowserWindow instance.
