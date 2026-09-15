@@ -1,11 +1,16 @@
 import { apiClient } from './apiClient';
 
 export const addNote = async (timeLogId: number, noteText: string) => {
-  const response = await apiClient.post(
-    `/tasks/time-logs/${timeLogId}/notes`,
-    { noteText }
-  );
-  return response.data;
+  try {
+    const response = await apiClient.post(
+      `/tasks/time-logs/${timeLogId}/notes`,
+      { noteText }
+    );
+    return response.data;
+  } catch (err: any) {
+    console.error('ADD NOTE ERROR:', err, err.response?.data);
+    throw err;
+  }
 };
 
 export const getNotes = async (timeLogId: number) => {
