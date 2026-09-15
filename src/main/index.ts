@@ -358,9 +358,16 @@ function registerIpcHandlers(): void {
         }
       });
 
+      const contentType = response.headers.get('content-type') || '';
       if (response.ok) {
         return await response.json();
       } else {
+        // If the response is not JSON, it's likely a proxy/firewall interception (common on screen lock)
+        if (!contentType.includes('application/json')) {
+          throw new Error(`Network interception detected (Status: ${response.status})`);
+        }
+        
+        // Otherwise it's a real API rejection
         throw new Error(`Refresh failed with status: ${response.status}`);
       }
     } catch (err) {

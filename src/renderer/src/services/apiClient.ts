@@ -67,14 +67,13 @@ apiClient.interceptors.response.use(
         const msg = refreshError.message || String(refreshError);
         const isAuthRejection = msg.includes('status: 401') || 
                                 msg.includes('status: 403') || 
-                                msg.includes('status: 400') || 
-                                msg.includes('refresh cookie found');
+                                msg.includes('status: 400');
 
         if (isAuthRejection) {
-          console.error('[Auth] Refresh explicitly rejected or missing cookie. Logging out.', msg);
+          console.error('[Auth] Refresh explicitly rejected. Logging out.', msg);
           useAuthStore.getState().logout();
         } else {
-          console.warn('[Auth] Refresh failed due to network or server error (e.g. 404/500). Not logging out.', msg);
+          console.warn('[Auth] Refresh failed due to network or lock screen error. Not logging out.', msg);
         }
         return Promise.reject(refreshError);
       }
