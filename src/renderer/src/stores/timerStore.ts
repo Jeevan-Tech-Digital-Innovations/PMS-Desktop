@@ -10,6 +10,7 @@ interface TimerState {
   activeBreakLimit: number | null;
   startTime: string | null;
   isOvertime: boolean;
+  previousSecondsToday: number;
 
   // Actions
   startTimer: (initialSeconds?: number) => void;
@@ -35,6 +36,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
   activeBreakLimit: null,
   startTime: null,
   isOvertime: false,
+  previousSecondsToday: 0,
 
   startTimer: (initialSeconds = 0) =>
     set({
@@ -42,6 +44,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       isOnBreak: false,
       isIdle: false,
       workSeconds: initialSeconds,
+      previousSecondsToday: initialSeconds,
       idleSeconds: 0,
       breakSeconds: 0,
       activeBreakLimit: null,
@@ -123,5 +126,6 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       activeBreakLimit: null,
       startTime: null,
       isOvertime: false,
+      previousSecondsToday: 0,
     }),
 }));

@@ -47,7 +47,7 @@ export function useTimerSync() {
               try {
                 if (activeLog?.id) {
                   const { transitionTimerState } = await import('@/pages/TimeTracking/TimeTrackingApi.services');
-                  await transitionTimerState(activeLog.projectTask?.id || activeLog.taskId, 'OVERTIME');
+                  await transitionTimerState(activeLog.taskId, 'OVERTIME');
                 }
                 useTimerStore.getState().setOvertime(true);
               } catch (e) {
@@ -175,6 +175,7 @@ export function useTimerSync() {
               isOnBreak: isAway,
               isIdle: false,
               workSeconds: totalInitialSeconds,
+              previousSecondsToday: previousSecondsToday,
               idleSeconds: 0,
               breakSeconds: 0,
               startTime: activeLog.startTime,
@@ -218,10 +219,11 @@ export function useTimerSync() {
             if (activeLog.startTime && !isOnBreak) {
               const startMs = new Date(activeLog.startTime).getTime();
               if (!isNaN(startMs)) {
-                const calculated = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
+                const calculatedSession = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
+                const calculatedTotal = useTimerStore.getState().previousSecondsToday + calculatedSession;
                 const currentSec = useTimerStore.getState().workSeconds;
-                if (Math.abs(calculated - currentSec) > 10) {
-                  useTimerStore.setState({ workSeconds: calculated });
+                if (Math.abs(calculatedTotal - currentSec) > 10) {
+                  useTimerStore.setState({ workSeconds: calculatedTotal });
                 }
               }
             }
