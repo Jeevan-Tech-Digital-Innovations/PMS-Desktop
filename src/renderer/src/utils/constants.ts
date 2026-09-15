@@ -27,7 +27,7 @@ export const API_ENDPOINTS = {
   // BREAK_START: (timeLogId: number) => `/tasks/time-logs/${timeLogId}/breaks/start`,
   // BREAK_STOP: (timeLogId: number) => `/tasks/time-logs/${timeLogId}/breaks/stop`,
   //
-  // NOTES_ADD: (timeLogId: number) => `/tasks/time-logs/${timeLogId}/notes`,
+  NOTES_ADD: (timeLogId: number) => `/tasks/time-logs/${timeLogId}/notes`,
   //
   // SCREENSHOTS_UPLOAD: (timeLogId: number) => `/time-logs/${timeLogId}/screenshots`,
 } as const;
