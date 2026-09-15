@@ -35,6 +35,8 @@ export async function uploadScreenshot(payload: UploadPayload): Promise<boolean>
     formData.append('mouseActivityPercent', String(payload.mouseActivity));
     formData.append('activeWindowTitle', payload.activeWindowTitle);
 
+    logger.info(`Uploading screenshot to: ${API_BASE}/screenshots/upload/${payload.timeLogId}`);
+
     let response = await fetch(
       `${API_BASE}/screenshots/upload/${payload.timeLogId}`,
       {
