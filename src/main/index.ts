@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, session, net } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, session, net, screen } from 'electron';
 import * as path from 'path';
 import { logger } from './utils/logger';
 import { authStore } from './utils/authStore';
@@ -52,10 +52,17 @@ function createWindow(): void {
   const iconFile = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
   const iconPath = path.join(__dirname, '../../resources', iconFile);
 
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth } = primaryDisplay.workAreaSize;
+  const windowWidth = 400;
+  const windowHeight = 700;
+
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 900,
+    width: windowWidth,
+    height: windowHeight,
+    x: screenWidth - windowWidth - 20,
+    y: 20,
+    minWidth: 350,
     minHeight: 600,
     title: 'ENJEV | PMS Desktop',
     icon: path.join(__dirname, '../../resources/icon.png'),
