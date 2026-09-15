@@ -64,6 +64,7 @@ function createWindow(): void {
     y: 20,
     minWidth: 350,
     minHeight: 600,
+    resizable: false,
     title: 'ENJEV | PMS Desktop',
     icon: path.join(__dirname, '../../resources/icon.png'),
     show: false,
