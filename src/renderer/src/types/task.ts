@@ -10,6 +10,7 @@ export interface Task {
   status: string;
   priority: string;
   dueDate: string;
+  startDate: string | null;
   billable: boolean;
   list: string;
   estimatedTime: string;

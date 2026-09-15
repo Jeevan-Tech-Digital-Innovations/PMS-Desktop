@@ -42,8 +42,9 @@ const ItemCard = ({ item, isSelected, onSelect }: ItemCardProps) => (
       )}
     </div>
     <span className={styles.meta}>
-      {item.status}
-      {item.priority && ` · ${item.priority}`}
+      {item.startDate ? `Start: ${item.startDate}` : `Start: -`}
+      {' · '}
+      {item.dueDate ? `Due: ${item.dueDate}` : `Due: -`}
     </span>
   </button>
 );

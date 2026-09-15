@@ -59,9 +59,23 @@ apiClient.interceptors.response.use(
         } else {
           throw new Error('Refresh session did not return an access token');
         }
-      } catch (refreshError) {
-        // Refresh failed "?" force logout
-        useAuthStore.getState().logout();
+      } catch (refreshError: any) {
+        // Refresh failed. 
+        // Only force logout if the server explicitly rejected the token (400, 401, 403) 
+        // or if the refresh cookie is missing. 
+        // Do NOT log out for 404 (Staging bug), 500, or Network Errors!
+        const msg = refreshError.message || String(refreshError);
+        const isAuthRejection = msg.includes('status: 401') || 
+                                msg.includes('status: 403') || 
+                                msg.includes('status: 400') || 
+                                msg.includes('refresh cookie found');
+
+        if (isAuthRejection) {
+          console.error('[Auth] Refresh explicitly rejected or missing cookie. Logging out.', msg);
+          useAuthStore.getState().logout();
+        } else {
+          console.warn('[Auth] Refresh failed due to network or server error (e.g. 404/500). Not logging out.', msg);
+        }
         return Promise.reject(refreshError);
       }
     }
