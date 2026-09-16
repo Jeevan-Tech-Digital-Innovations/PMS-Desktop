@@ -74,10 +74,6 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     const now = Date.now();
     const { isRunning, isOnBreak, isIdle, lastTickTime } = get();
     if (!isRunning || isOnBreak) {
-      if (isRunning && isOnBreak) {
-        // If on break, keep updating lastTickTime so work timer doesn't jump when break stops
-        set({ lastTickTime: now });
-      }
       return;
     }
 

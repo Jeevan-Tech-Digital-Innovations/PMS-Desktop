@@ -32,8 +32,9 @@ import { uploadScreenshot } from './services/uploader';
 let mainWindow: BrowserWindow | null = null;
 let screenshotInterval: ReturnType<typeof setInterval> | null = null;
 let currentActiveWindowTitle = '';
+let currentTimeLogId: number | null = null;
 
-const SCREENSHOT_INTERVAL_MS = 300_000; // 5 minutes
+const SCREENSHOT_INTERVAL_MS = 120_000; // 2 minutes
 
 /**
  * Returns the main BrowserWindow instance.
@@ -112,6 +113,8 @@ function createWindow(): void {
 
 // ── Background Services Orchestration ────────────────────────────
 function startAllBackgroundServices(timeLogId: number, startTime: string): void {
+  currentTimeLogId = timeLogId;
+
   // Activity monitor
   startActivityMonitor();
 
@@ -155,6 +158,7 @@ function stopAllBackgroundServices(): void {
     clearInterval(screenshotInterval);
     screenshotInterval = null;
   }
+  currentTimeLogId = null;
 
   logger.info('All background services stopped');
   console.log('[Background] All background services stopped');
@@ -169,10 +173,16 @@ async function captureAndUploadScreenshot(timeLogId: number): Promise<void> {
   const { keyboardActivity, mouseActivity } = getActivityPercentages();
   resetActivityCounters();
 
+  const pad = (n: number) => (n < 10 ? '0' + n : n);
+  const now = new Date();
+  const capturedAt = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
+    now.getDate(),
+  )} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
   await uploadScreenshot({
     timeLogId,
     imgBuffer,
-    capturedAt: new Date().toISOString(),
+    capturedAt,
     keyboardActivity,
     mouseActivity,
     activeWindowTitle: currentActiveWindowTitle,
@@ -264,7 +274,7 @@ function registerIpcHandlers(): void {
               // We must check all cookies because the cookie might be set on the web URL domain instead of the API URL domain
               const cookies = await authWindow.webContents.session.cookies.get({});
               foundCookieNames = cookies.map(c => c.name);
-              const refresh = cookies.find(c => c.name === 'axis_refresh_staging');
+              const refresh = cookies.find(c => c.name === 'axis_refresh_staging' || c.name === 'axis_refresh');
               if (refresh) {
                 refreshCookie = refresh;
                 // Force alias the cookie to 'axis_refresh' so the API can read it
@@ -351,7 +361,7 @@ function registerIpcHandlers(): void {
       const domain = new URL(urls.axisApiUrl).hostname;
       // Use default session to find the refresh cookie
       const cookies = await session.defaultSession.cookies.get({ domain });
-      const refreshCookie = cookies.find(c => c.name === 'axis_refresh_staging');
+      const refreshCookie = cookies.find(c => c.name === 'axis_refresh_staging' || c.name === 'axis_refresh');
 
       if (!refreshCookie) {
         throw new Error('No refresh cookie found');
@@ -400,10 +410,26 @@ function registerIpcHandlers(): void {
   ipcMain.on(IPC.BREAK_START, () => {
     pauseActivityMonitor();
     pauseIdleMonitor();
+    if (screenshotInterval) {
+      clearInterval(screenshotInterval);
+      screenshotInterval = null;
+    }
   });
+  
   ipcMain.on(IPC.BREAK_STOP, () => {
     resumeActivityMonitor();
     resumeIdleMonitor();
+    
+    if (currentTimeLogId) {
+      if (screenshotInterval) {
+        clearInterval(screenshotInterval);
+      }
+      screenshotInterval = setInterval(async () => {
+        if (currentTimeLogId) {
+          await captureAndUploadScreenshot(currentTimeLogId);
+        }
+      }, SCREENSHOT_INTERVAL_MS);
+    }
   });
 
   // Screenshot manual capture

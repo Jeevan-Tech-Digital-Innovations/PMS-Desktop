@@ -44,19 +44,17 @@ function buildActivityLogPayload(): Array<Record<string, string>> {
 }
 
 export async function startTimeLog(taskId: number) {
-  const userId = useAuthStore.getState().user?.userId;
   const activityPayload = buildActivityLogPayload();
   const { data } = await apiClient.post(
-    `${API_ENDPOINTS.TIME_LOGS_START(taskId)}?userId=${userId}`,
+    API_ENDPOINTS.TIME_LOGS_START(taskId),
     activityPayload,
   );
   return data?.data ? data.data : data;
 }
 
 export async function stopTimeLog(taskId: number) {
-  const userId = useAuthStore.getState().user?.userId;
   const { data } = await apiClient.put(
-    `${API_ENDPOINTS.TIME_LOGS_STOP(taskId)}?userId=${userId}`,
+    API_ENDPOINTS.TIME_LOGS_STOP(taskId),
   );
   return data?.data ? data.data : data;
 }
