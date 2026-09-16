@@ -62,7 +62,8 @@ export async function stopTimeLog(taskId: number) {
 }
 
 export async function getActiveTimeLog() {
-  const { data } = await apiClient.get(API_ENDPOINTS.TIME_LOGS_ACTIVE);
+  const userId = useAuthStore.getState().user?.userId;
+  const { data } = await apiClient.get(`${API_ENDPOINTS.TIME_LOGS_ACTIVE}?userId=${userId}`);
   return (data?.data ? data.data : data) || null;
 }
 
@@ -80,7 +81,8 @@ export async function getPreviousSecondsTodayForTask(
     let logs: any[] = [];
 
     try {
-      const res = await apiClient.get(API_ENDPOINTS.TIME_LOGS);
+      const userId = useAuthStore.getState().user?.userId;
+      const res = await apiClient.get(`${API_ENDPOINTS.TIME_LOGS}?userId=${userId}`);
       logs = Array.isArray(res.data) ? res.data : res.data?.data || [];
     } catch {
       // ignore — will return 0
@@ -103,15 +105,21 @@ export async function getPreviousSecondsTodayForTask(
         log.endTime &&
         log.startTime
       ) {
-        // Verify the log is from today
-        const logStart = new Date(log.startTime).getTime();
+        const parseLogTime = (timeStr: string) => {
+          let str = timeStr;
+          if (str.includes(' ') && !str.includes('T')) str = str.replace(' ', 'T');
+          if (!str.endsWith('Z') && !str.match(/[+-]\d{2}:?\d{2}$/)) str += 'Z';
+          return new Date(str).getTime();
+        };
+
+        const logStart = parseLogTime(log.startTime);
         if (logStart >= startOfToday) {
           if (log.durationMinutes != null && log.durationMinutes > 0) {
             // Use server-computed duration (most accurate)
             previousSecondsToday += log.durationMinutes * 60;
           } else {
             // Fallback: compute from timestamps
-            const logEnd = new Date(log.endTime).getTime();
+            const logEnd = parseLogTime(log.endTime);
             if (logEnd > logStart) {
               previousSecondsToday += Math.floor((logEnd - logStart) / 1000);
             }

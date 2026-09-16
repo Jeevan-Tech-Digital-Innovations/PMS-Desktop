@@ -11,6 +11,7 @@ interface TimerState {
   startTime: string | null;
   isOvertime: boolean;
   previousSecondsToday: number;
+  lastTickTime: number;
 
   // Actions
   startTimer: (initialSeconds?: number) => void;
@@ -37,6 +38,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
   startTime: null,
   isOvertime: false,
   previousSecondsToday: 0,
+  lastTickTime: 0,
 
   startTimer: (initialSeconds = 0) =>
     set({
@@ -50,6 +52,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       activeBreakLimit: null,
       startTime: new Date().toISOString(),
       isOvertime: false,
+      lastTickTime: Date.now(),
     }),
 
   setWorkSeconds: (seconds) =>
@@ -64,15 +67,35 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       isIdle: false,
       isOvertime: false,
       activeBreakLimit: null,
+      lastTickTime: 0,
     }),
 
   tick: () => {
-    const { isRunning, isOnBreak, isIdle } = get();
-    if (!isRunning || isOnBreak) return;
-    if (isIdle) {
-      set((state) => ({ idleSeconds: state.idleSeconds + 1 }));
-    } else {
-      set((state) => ({ workSeconds: state.workSeconds + 1 }));
+    const now = Date.now();
+    const { isRunning, isOnBreak, isIdle, lastTickTime } = get();
+    if (!isRunning || isOnBreak) {
+      if (isRunning && isOnBreak) {
+        // If on break, keep updating lastTickTime so work timer doesn't jump when break stops
+        set({ lastTickTime: now });
+      }
+      return;
+    }
+
+    const elapsedMs = now - (lastTickTime || now);
+    const elapsedSeconds = Math.floor(elapsedMs / 1000);
+
+    if (elapsedSeconds >= 1) {
+      if (isIdle) {
+        set((state) => ({ 
+          idleSeconds: state.idleSeconds + elapsedSeconds,
+          lastTickTime: state.lastTickTime + (elapsedSeconds * 1000)
+        }));
+      } else {
+        set((state) => ({ 
+          workSeconds: state.workSeconds + elapsedSeconds,
+          lastTickTime: state.lastTickTime + (elapsedSeconds * 1000)
+        }));
+      }
     }
   },
 
@@ -80,9 +103,10 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     set((state) => ({
       isIdle: true,
       idleSeconds: state.idleSeconds + offsetSeconds,
+      lastTickTime: Date.now(),
     })),
 
-  stopIdle: () => set({ isIdle: false }),
+  stopIdle: () => set({ isIdle: false, lastTickTime: Date.now() }),
 
   startBreak: (reasonText = '') => {
     let limit = null;
@@ -97,6 +121,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       isOnBreak: true,
       breakSeconds: 0,
       activeBreakLimit: limit,
+      lastTickTime: Date.now(),
     });
   },
 
@@ -104,12 +129,21 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     set({
       isOnBreak: false,
       activeBreakLimit: null,
+      lastTickTime: Date.now(),
     }),
 
   tickBreak: () => {
-    const { isOnBreak } = get();
+    const now = Date.now();
+    const { isOnBreak, lastTickTime } = get();
     if (isOnBreak) {
-      set((state) => ({ breakSeconds: state.breakSeconds + 1 }));
+      const elapsedMs = now - (lastTickTime || now);
+      const elapsedSeconds = Math.floor(elapsedMs / 1000);
+      if (elapsedSeconds >= 1) {
+        set((state) => ({ 
+          breakSeconds: state.breakSeconds + elapsedSeconds,
+          lastTickTime: state.lastTickTime + (elapsedSeconds * 1000)
+        }));
+      }
     }
   },
 
@@ -127,5 +161,6 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       startTime: null,
       isOvertime: false,
       previousSecondsToday: 0,
+      lastTickTime: 0,
     }),
 }));

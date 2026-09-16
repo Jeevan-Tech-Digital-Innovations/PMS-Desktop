@@ -217,12 +217,20 @@ export function useTimerSync() {
 
             // Reconcile drift if greater than 10 seconds
             if (activeLog.startTime && !isOnBreak) {
-              const startMs = new Date(activeLog.startTime).getTime();
+              let timeStr = activeLog.startTime;
+              if (timeStr.includes(' ') && !timeStr.includes('T')) {
+                timeStr = timeStr.replace(' ', 'T');
+              }
+              if (!timeStr.endsWith('Z') && !timeStr.match(/[+-]\d{2}:?\d{2}$/)) {
+                timeStr += 'Z';
+              }
+              const startMs = new Date(timeStr).getTime();
               if (!isNaN(startMs)) {
                 const calculatedSession = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
                 const calculatedTotal = useTimerStore.getState().previousSecondsToday + calculatedSession;
                 const currentSec = useTimerStore.getState().workSeconds;
-                if (Math.abs(calculatedTotal - currentSec) > 10) {
+                // Add a sanity check: if calculatedTotal is unreasonably far from currentSec (> 8 hours), ignore it to prevent huge jumps
+                if (Math.abs(calculatedTotal - currentSec) > 10 && Math.abs(calculatedTotal - currentSec) < 28800) {
                   useTimerStore.setState({ workSeconds: calculatedTotal });
                 }
               }

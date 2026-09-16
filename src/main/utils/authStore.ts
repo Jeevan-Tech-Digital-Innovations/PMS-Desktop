@@ -68,20 +68,20 @@ export const authStore = {
     const axisApiUrl = process.env.VITE_AXIS_API_URL || 'http://localhost:8081/api';
     const domain = new URL(axisApiUrl).hostname;
     
-    // Use default session to find the axis_refresh cookie
+    // Use default session to find the axis_refresh_staging cookie
     const cookies = await session.defaultSession.cookies.get({ domain });
-    const refreshCookie = cookies.find((c: any) => c.name === 'axis_refresh');
+    const refreshCookie = cookies.find((c: any) => c.name === 'axis_refresh_staging' || c.name === 'axis_refresh');
     
     if (!refreshCookie) {
       throw new Error('No refresh cookie found');
     }
 
-    const confirmUrl = axisApiUrl.replace(/\/api$/, '/v1') + '/auth/confirm-access';
+    const confirmUrl = axisApiUrl.replace(/\/api\/?$/, '/api/v1') + '/auth/confirm-access';
     const response = await fetch(confirmUrl, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'Cookie': `${refreshCookie.name}=${refreshCookie.value}`
+        'Cookie': `axis_refresh=${refreshCookie.value}`
       }
     });
     
