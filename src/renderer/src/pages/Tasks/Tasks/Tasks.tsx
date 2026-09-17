@@ -38,9 +38,27 @@ const ItemCard = ({ item, isSelected, onSelect }: ItemCardProps) => (
     <div className={styles.cardTop}>
       <span className={styles.name}>{item.title}</span>
       {item.itemType === 'subtask' && (
-        <span className={styles.subtaskBadge}>Subtask</span>
+        <span
+          className={`${styles.subtaskBadge} ${
+            item.level === 2
+              ? styles.badgeL2
+              : item.level === 3
+              ? styles.badgeL3
+              : item.level >= 4
+              ? styles.badgeL4
+              : ''
+          }`}
+        >
+          {item.level && item.level > 1 ? `L${item.level} Subtask` : 'Subtask'}
+        </span>
       )}
     </div>
+    {item.parentTaskTitle && (
+      <div className={styles.parentBreadcrumb} title={`Parent: ${item.parentTaskTitle}`}>
+        <span className={styles.breadcrumbArrow}>↳</span>
+        <span className={styles.parentText}>{item.parentTaskTitle}</span>
+      </div>
+    )}
     <span className={styles.meta}>
       {item.startDate ? `Start: ${item.startDate}` : `Start: -`}
       {' · '}

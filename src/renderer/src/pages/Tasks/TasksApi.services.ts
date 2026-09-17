@@ -1,86 +1,300 @@
 import { apiClient } from '@/services/apiClient';
 import { Task } from '@/types/task';
 import { API_ENDPOINTS } from '@/utils/constants';
+import { useAuthStore } from '@/stores/authStore';
 
 export type ItemType = 'task' | 'subtask';
 
 export interface AssignedItem extends Task {
   itemType: ItemType;
+  level: number;
+  parentTaskTitle?: string;
+  hierarchyPath?: string[];
 }
 
 /**
- * Fetch ONLY the tasks and subtasks directly assigned to the user.
- * Each appears as an independent flat card — no parent shown unless user is assigned to it too.
+ * Gather all candidate user identifiers (UUID, ID, username, email)
+ * from the passed parameter, zustand auth store, and JWT token payload.
+ */
+function getUserIdentifiers(userId?: string | number): Set<string> {
+  const ids = new Set<string>();
+  if (userId != null && String(userId).trim()) {
+    ids.add(String(userId).trim().toLowerCase());
+  }
+
+  try {
+    const user = useAuthStore.getState().user;
+    if (user) {
+      if (user.userId != null) ids.add(String(user.userId).trim().toLowerCase());
+      if ((user as any).id != null) ids.add(String((user as any).id).trim().toLowerCase());
+      if (user.email) ids.add(user.email.trim().toLowerCase());
+      if (user.username) ids.add(user.username.trim().toLowerCase());
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const token = useAuthStore.getState().accessToken;
+    if (token) {
+      const parts = token.split('.');
+      if (parts.length >= 2) {
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        if (payload.sub) ids.add(String(payload.sub).trim().toLowerCase());
+        if (payload.userId) ids.add(String(payload.userId).trim().toLowerCase());
+        if (payload.id) ids.add(String(payload.id).trim().toLowerCase());
+        if (payload.user_id) ids.add(String(payload.user_id).trim().toLowerCase());
+        if (payload.email) ids.add(String(payload.email).trim().toLowerCase());
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return ids;
+}
+
+/**
+ * Check whether a task or subtask is assigned to any of the user's identifiers.
+ */
+function isTaskAssigned(t: any, userIds: Set<string>): boolean {
+  if (userIds.size === 0) return true;
+
+  // 1. Check assignee
+  const assigneeVal = typeof t.assignee === 'object' && t.assignee !== null
+    ? (t.assignee.id || t.assignee.userId || '')
+    : t.assignee;
+  if (assigneeVal && userIds.has(String(assigneeVal).trim().toLowerCase())) return true;
+
+  // 2. Check assigneeId
+  const assigneeIdVal = typeof t.assigneeId === 'object' && t.assigneeId !== null
+    ? (t.assigneeId.id || t.assigneeId.userId || '')
+    : t.assigneeId;
+  if (assigneeIdVal && userIds.has(String(assigneeIdVal).trim().toLowerCase())) return true;
+
+  // 3. Check members array (array of strings, UUIDs, or member objects)
+  if (Array.isArray(t.members)) {
+    for (const m of t.members) {
+      const mVal = typeof m === 'object' && m !== null
+        ? (m.id || m.userId || m.memberId || '')
+        : m;
+      if (mVal && userIds.has(String(mVal).trim().toLowerCase())) return true;
+    }
+  }
+
+  // 4. Check membersString (comma-separated string of UUIDs)
+  if (typeof t.membersString === 'string' && t.membersString) {
+    const parts = t.membersString.split(',');
+    for (const p of parts) {
+      if (userIds.has(p.trim().toLowerCase())) return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Calculate the depth / level of a task (1 = main task, 2 = subtask, 3 = sub-subtask, 4 = 4th level, etc.)
+ */
+function calculateTaskLevel(task: any, taskMap: Map<number, any>): number {
+  let level = 1;
+  let currentParentId = task.parentTaskId;
+  const visited = new Set<number>([Number(task.id)]);
+
+  while (currentParentId && taskMap.has(Number(currentParentId))) {
+    level++;
+    const parentIdNum = Number(currentParentId);
+    if (visited.has(parentIdNum)) break;
+    visited.add(parentIdNum);
+    const parent = taskMap.get(parentIdNum);
+    currentParentId = parent?.parentTaskId;
+  }
+  return level;
+}
+
+/**
+ * Find root task ID for logical tree grouping
+ */
+function getRootTaskId(task: any, taskMap: Map<number, any>): number {
+  let current = task;
+  const visited = new Set<number>([Number(task.id)]);
+
+  while (current.parentTaskId && taskMap.has(Number(current.parentTaskId))) {
+    const parentIdNum = Number(current.parentTaskId);
+    if (visited.has(parentIdNum)) break;
+    visited.add(parentIdNum);
+    current = taskMap.get(parentIdNum);
+  }
+  return Number(current.id);
+}
+
+/**
+ * Retrieve the parent task title if available
+ */
+function getParentTitle(task: any, taskMap: Map<number, any>): string | undefined {
+  if (!task.parentTaskId) return undefined;
+  const parent = taskMap.get(Number(task.parentTaskId));
+  return parent ? (parent.title || parent.projectTaskName) : undefined;
+}
+
+/**
+ * Fetch all tasks and subtasks directly assigned to the user across ALL 4+ levels.
+ * Each item is an independent selectable card with its level and parent context.
  */
 export async function fetchAssignedItems(
   projectId: number,
   userId?: string | number
 ): Promise<AssignedItem[]> {
-  const uid = userId ? String(userId) : null;
+  const userIds = getUserIdentifiers(userId);
+  const taskMap = new Map<number, any>();
 
-  const isAssigned = (t: any): boolean => {
-    if (!uid) return true;
-    const isAssignee = String(t.assignee || t.assigneeId || '') === uid;
-    const isMember = Array.isArray(t.members) && t.members.map(String).includes(uid);
-    return isAssignee || isMember;
+  // Helper to safely store tasks in map
+  const addTask = (t: any) => {
+    if (!t) return;
+    const id = Number(t.id || t.projectTaskId);
+    if (!id || isNaN(id)) return;
+    if (!taskMap.has(id)) {
+      taskMap.set(id, {
+        ...t,
+        id,
+        title: t.title || t.projectTaskName || 'Untitled Task',
+        parentTaskId: t.parentTaskId != null ? Number(t.parentTaskId) : null,
+      });
+    } else {
+      const existing = taskMap.get(id);
+      taskMap.set(id, {
+        ...existing,
+        ...t,
+        id,
+        title: t.title || existing.title || t.projectTaskName || 'Untitled Task',
+        parentTaskId: t.parentTaskId != null ? Number(t.parentTaskId) : existing.parentTaskId,
+      });
+    }
   };
 
-  // 1. Fetch all tasks for the project
-  const { data } = await apiClient.get<Task[]>(API_ENDPOINTS.PROJECT_TASKS(projectId), {
-    params: { size: 500, page: 0 },
-  });
-  const allTasks: any[] = Array.isArray(data) ? data : (data as any).content || [];
-
-  const topLevel = allTasks.filter((t: any) => !t.parentTaskId);
-  const subTasksFromList = allTasks.filter((t: any) => !!t.parentTaskId);
-
-  const result: AssignedItem[] = [];
-
-  // 2. Add top-level tasks directly assigned to user
-  for (const task of topLevel) {
-    if (isAssigned(task)) {
-      result.push({ ...task, itemType: 'task' });
-    }
-  }
-
-  // 3. Collect subtasks: from list + fetch for each top-level task
-  const allSubTasks: any[] = [...subTasksFromList];
-
-  // Fetch subtasks for each top-level task unconditionally to ensure we don't miss any
-  // due to pagination or backend filtering on the main PROJECT_TASKS endpoint.
-  for (const task of topLevel) {
-    try {
-      const subRes = await apiClient.get<Task[]>(API_ENDPOINTS.SUB_TASKS(task.id));
-      const subData: any[] = Array.isArray(subRes.data)
-        ? subRes.data
-        : (subRes.data as any).content || [];
-      
-      // Only push if not already in allSubTasks
-      for (const s of subData) {
-        if (!allSubTasks.some(existing => String(existing.id) === String(s.id))) {
-          allSubTasks.push(s);
+  // Helper to extract nested tasks
+  const extractNested = (item: any) => {
+    if (!item) return;
+    if (Array.isArray(item.subTasks)) {
+      for (const s of item.subTasks) {
+        if (s) {
+          if (!s.parentTaskId && item.id) s.parentTaskId = item.id;
+          addTask(s);
+          extractNested(s);
         }
       }
-      
-      // Also extract subtasks that might be nested inside taskList
-      if (Array.isArray((task as any).taskList)) {
-        for (const s of (task as any).taskList) {
-          if (!allSubTasks.some(existing => String(existing.id) === String(s.id))) {
-            allSubTasks.push(s);
+    }
+    if (Array.isArray(item.taskList)) {
+      for (const s of item.taskList) {
+        if (s) {
+          if (!s.parentTaskId && item.id) s.parentTaskId = item.id;
+          addTask(s);
+          extractNested(s);
+        }
+      }
+    }
+  };
+
+  // 1. Fetch from /tasks (which queries all tasks across all levels for the project)
+  try {
+    const res = await apiClient.get<Task[]>('/tasks', {
+      params: { projectId, size: 1000, page: 1 },
+    });
+    const list: any[] = Array.isArray(res.data) ? res.data : (res.data as any)?.content || [];
+    for (const t of list) addTask(t);
+  } catch {
+    // ignore
+  }
+
+  // 2. Fetch from PROJECT_TASKS (/projects/${projectId}/tasks)
+  try {
+    const { data } = await apiClient.get<Task[]>(API_ENDPOINTS.PROJECT_TASKS(projectId), {
+      params: { size: 500, page: 0 },
+    });
+    const list: any[] = Array.isArray(data) ? data : (data as any)?.content || [];
+    for (const t of list) addTask(t);
+  } catch {
+    // ignore
+  }
+
+  // 3. Extract any nested subtasks from items fetched so far
+  for (const t of Array.from(taskMap.values())) {
+    extractNested(t);
+  }
+
+  // 4. Iteratively query /tasks/${id}/subtasks up to 4+ levels deep to guarantee NO subtask is missed
+  const fetchedParentIds = new Set<number>();
+
+  for (let depth = 1; depth <= 4; depth++) {
+    const tasksToFetch = Array.from(taskMap.values()).filter(
+      (t) => !fetchedParentIds.has(t.id)
+    );
+    if (tasksToFetch.length === 0) break;
+
+    for (const t of tasksToFetch) {
+      fetchedParentIds.add(t.id);
+    }
+
+    let newFound = 0;
+    const batchSize = 10;
+    for (let i = 0; i < tasksToFetch.length; i += batchSize) {
+      const batch = tasksToFetch.slice(i, i + batchSize);
+      const settled = await Promise.allSettled(
+        batch.map((t) => apiClient.get<Task[]>(API_ENDPOINTS.SUB_TASKS(t.id)))
+      );
+
+      for (let j = 0; j < settled.length; j++) {
+        const outcome = settled[j];
+        const parentTask = batch[j];
+        if (outcome.status === 'fulfilled') {
+          const subData: any[] = Array.isArray(outcome.value.data)
+            ? outcome.value.data
+            : (outcome.value.data as any)?.content || [];
+
+          for (const s of subData) {
+            if (s) {
+              const subId = Number(s.id || s.projectTaskId);
+              if (subId && !taskMap.has(subId)) {
+                if (!s.parentTaskId) s.parentTaskId = parentTask.id;
+                addTask(s);
+                extractNested(s);
+                newFound++;
+              }
+            }
           }
         }
       }
-    } catch {
-      // ignore
+    }
+
+    if (newFound === 0) break;
+  }
+
+  // 5. Build assigned items list with level and parent title
+  const result: AssignedItem[] = [];
+
+  for (const task of Array.from(taskMap.values())) {
+    if (isTaskAssigned(task, userIds)) {
+      const level = calculateTaskLevel(task, taskMap);
+      const parentTaskTitle = getParentTitle(task, taskMap);
+      const itemType: ItemType = level === 1 ? 'task' : 'subtask';
+
+      result.push({
+        ...task,
+        itemType,
+        level,
+        parentTaskTitle,
+      });
     }
   }
 
-  // 4. Add only subtasks directly assigned to user
-  for (const sub of allSubTasks) {
-    if (isAssigned(sub)) {
-      result.push({ ...sub, itemType: 'subtask' });
-    }
-  }
+  // 6. Sort logically: group by root task tree, then level, then id
+  result.sort((a, b) => {
+    const rootA = getRootTaskId(a, taskMap);
+    const rootB = getRootTaskId(b, taskMap);
+    if (rootA !== rootB) return rootA - rootB;
+    if (a.level !== b.level) return a.level - b.level;
+    return a.id - b.id;
+  });
 
   return result;
 }
