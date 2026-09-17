@@ -34,7 +34,7 @@ let screenshotInterval: ReturnType<typeof setInterval> | null = null;
 let currentActiveWindowTitle = '';
 let currentTimeLogId: number | null = null;
 
-const SCREENSHOT_INTERVAL_MS = 120_000; // 2 minutes
+const SCREENSHOT_INTERVAL_MS = 600_000; // 10 minutes
 
 /**
  * Returns the main BrowserWindow instance.
@@ -177,7 +177,7 @@ async function captureAndUploadScreenshot(timeLogId: number): Promise<void> {
   const now = new Date();
   const capturedAt = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
     now.getDate(),
-  )} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  )}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}.000Z`;
 
   await uploadScreenshot({
     timeLogId,

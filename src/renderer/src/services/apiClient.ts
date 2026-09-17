@@ -46,8 +46,20 @@ apiClient.interceptors.response.use(
         const newAccessToken = data.accessToken || data.data?.accessToken;
 
         if (newAccessToken) {
+          const currentUser = useAuthStore.getState().user;
+          const returnedUser = data.user || data.data?.user;
+          
+          let nextUser = currentUser;
+          if (returnedUser) {
+            nextUser = {
+              ...(currentUser || {}),
+              ...returnedUser,
+              userId: returnedUser.id || returnedUser.userId || currentUser?.userId || 1,
+            } as any;
+          }
+
           useAuthStore.getState().setAuth({
-            user: data.user || data.data?.user || useAuthStore.getState().user,
+            user: nextUser as any,
             accessToken: newAccessToken,
             refreshToken: '', // Refresh token is now in a secure cookie, not state
             rememberMe: true, // Preserve remember me state
