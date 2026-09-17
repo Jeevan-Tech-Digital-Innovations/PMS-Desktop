@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, session, net, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, session, net, screen, shell } from 'electron';
 import * as path from 'path';
 import { logger } from './utils/logger';
 import { authStore } from './utils/authStore';
@@ -28,6 +28,7 @@ import {
 } from './services/appActivity';
 import { captureScreenshot, cleanupTempScreenshots } from './services/screenshot';
 import { uploadScreenshot } from './services/uploader';
+import { showScreenshotNotification } from './services/notification';
 
 let mainWindow: BrowserWindow | null = null;
 let screenshotInterval: ReturnType<typeof setInterval> | null = null;
@@ -179,7 +180,7 @@ async function captureAndUploadScreenshot(timeLogId: number): Promise<void> {
     now.getDate(),
   )} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 
-  await uploadScreenshot({
+  const uploadSuccess = await uploadScreenshot({
     timeLogId,
     imgBuffer,
     capturedAt,
@@ -188,7 +189,10 @@ async function captureAndUploadScreenshot(timeLogId: number): Promise<void> {
     activeWindowTitle: currentActiveWindowTitle,
   });
 
-  mainWindow?.webContents.send(IPC.SCREENSHOT_UPLOADED, { timeLogId });
+  if (uploadSuccess) {
+    showScreenshotNotification();
+    mainWindow?.webContents.send(IPC.SCREENSHOT_UPLOADED, { timeLogId });
+  }
 }
 
 // ── IPC Handlers ─────────────────────────────────────────────────
@@ -434,8 +438,11 @@ function registerIpcHandlers(): void {
 
   // Screenshot manual capture
   ipcMain.handle(IPC.SCREENSHOT_CAPTURE, async () => {
-    const filepath = await captureScreenshot();
-    return filepath;
+    const imgBuffer = await captureScreenshot();
+    if (imgBuffer) {
+      showScreenshotNotification();
+    }
+    return imgBuffer;
   });
 
   // App lifecycle
@@ -457,6 +464,39 @@ function registerIpcHandlers(): void {
 
 // ── App Lifecycle ────────────────────────────────────────────────
 app.whenReady().then(() => {
+  app.name = 'PMS Desktop';
+
+  if (process.platform === 'win32') {
+    const appId = 'PMS Desktop';
+    app.setAppUserModelId(appId);
+
+    // In development mode, register a Start Menu shortcut with this AppUserModelId
+    // so Windows displays "PMS Desktop" as the application name on notifications
+    // instead of the node_modules executable path.
+    if (!app.isPackaged) {
+      try {
+        const shortcutDir = path.join(
+          app.getPath('appData'),
+          'Microsoft',
+          'Windows',
+          'Start Menu',
+          'Programs'
+        );
+        const shortcutPath = path.join(shortcutDir, 'PMS Desktop.lnk');
+        shell.writeShortcutLink(shortcutPath, 'create', {
+          target: process.execPath,
+          args: process.argv.slice(1).join(' '),
+          appUserModelId: appId,
+          description: 'PMS Desktop Application',
+          icon: path.join(__dirname, '../../resources/icon.ico'),
+          iconIndex: 0,
+        });
+      } catch (err) {
+        logger.warn('Failed to create dev shortcut for notifications', err);
+      }
+    }
+  }
+
   // Ignore certificate errors for the Axis SSO login window behind corporate proxies
   app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
     event.preventDefault();
