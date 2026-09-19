@@ -119,14 +119,46 @@ async function sendBatch(logId: number, events: AppActivityEvent[]): Promise<voi
   }
 
   try {
-    const payload = events.map(e => ({
-      appName: e.appName,
-      url: e.taskTitle,
-      startTime: e.startTime,
-      endTime: e.endTime,
-      durationSeconds: e.durationSeconds,
-      timeLogId: logId
-    }));
+    // 1. Fetch current user settings to get trackAppsUrls preference
+    let trackAppsUrls = "Track Apps & URLs both";
+    try {
+      const settingsResp = await fetch(`${API_BASE}/employees/me`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (settingsResp.ok) {
+        const json = await settingsResp.json();
+        trackAppsUrls = json.data?.trackAppsUrls || trackAppsUrls;
+      }
+    } catch (err) {
+      logger.error('Failed to fetch employee settings for app activity', err);
+    }
+
+    // 2. If OFF, drop the entire payload to save space
+    if (trackAppsUrls === "OFF") {
+      logger.debug('App activity tracking is OFF. Dropping payload.');
+      return;
+    }
+
+    // 3. Mask data based on preferences
+    const payload = events.map(e => {
+      let finalAppName = e.appName;
+      let finalUrl = e.taskTitle; // taskTitle maps to URL in API payload
+
+      if (trackAppsUrls === "Track Apps only") {
+        finalUrl = "Restricted";
+      } else if (trackAppsUrls === "Track URLs only") {
+        finalAppName = "Restricted";
+      }
+
+      return {
+        appName: finalAppName,
+        url: finalUrl,
+        startTime: e.startTime,
+        endTime: e.endTime,
+        durationSeconds: e.durationSeconds,
+        timeLogId: logId
+      };
+    });
 
     let response = await fetch(`${API_BASE}/activity/apps/bulk`, {
       method: 'POST',

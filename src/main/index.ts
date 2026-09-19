@@ -29,6 +29,7 @@ import {
 import { captureScreenshot, cleanupTempScreenshots } from './services/screenshot';
 import { uploadScreenshot } from './services/uploader';
 import { showScreenshotNotification } from './services/notification';
+import { Jimp } from 'jimp';
 
 let mainWindow: BrowserWindow | null = null;
 let screenshotInterval: ReturnType<typeof setInterval> | null = null;
@@ -166,10 +167,42 @@ function stopAllBackgroundServices(): void {
 }
 
 async function captureAndUploadScreenshot(timeLogId: number): Promise<void> {
-  const imgBuffer = await captureScreenshot();
+  let imgBuffer = await captureScreenshot();
   if (!imgBuffer) return;
 
   console.log(`[Screenshot] Captured for timeLogId=${timeLogId} directly to memory`);
+
+  // Fetch latest employee settings from API
+  let employeeSettings: any = {};
+  try {
+    const { accessToken } = authStore.getTokens();
+    if (accessToken) {
+      // In main process we use API_BASE env, or fallback
+      const apiBase = process.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
+      const response = await net.fetch(`${apiBase}/employees/me`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (response.ok) {
+        const json = await response.json();
+        employeeSettings = json.data || {};
+      }
+    }
+  } catch (err) {
+    logger.error('Failed to fetch employee settings for screenshot', err);
+  }
+  
+  // Apply Blur if enabled
+  if (employeeSettings.screenshotBlur === 'On') {
+    try {
+      console.log('[Screenshot] Applying blur filter...');
+      const image = await Jimp.read(imgBuffer);
+      image.blur(15); // Apply heavy gaussian blur
+      imgBuffer = await image.getBuffer('image/jpeg');
+      console.log('[Screenshot] Blur applied successfully');
+    } catch (err) {
+      logger.error('Failed to blur screenshot', err);
+    }
+  }
 
   const { keyboardActivity, mouseActivity } = getActivityPercentages();
   resetActivityCounters();
@@ -190,7 +223,9 @@ async function captureAndUploadScreenshot(timeLogId: number): Promise<void> {
   });
 
   if (uploadSuccess) {
-    showScreenshotNotification();
+    if (employeeSettings.screenshotNotifications !== 'Disable') {
+      showScreenshotNotification();
+    }
     mainWindow?.webContents.send(IPC.SCREENSHOT_UPLOADED, { timeLogId });
   }
 }
