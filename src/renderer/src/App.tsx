@@ -3,7 +3,9 @@ import { Toaster } from 'react-hot-toast';
 import { useEffect } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { useTimerStore } from '@/stores/timerStore';
+import { useUiStore } from '@/stores/uiStore';
 import { useTimerSync } from '@/hooks/useTimerSync';
+import { fetchMyProfile } from '@/services/ProfileApi.services';
 
 // Page imports
 import { Login } from '@/pages/Login';
@@ -121,9 +123,23 @@ export default function App() {
   useEffect(() => {
     // Idle state changes from the main process activity monitor
     if (typeof window.electronAPI?.onIdleStarted !== 'function') return;
-    const unsubscribeStart = window.electronAPI.onIdleStarted((data) => {
+    const unsubscribeStart = window.electronAPI.onIdleStarted(async (data) => {
       console.log('[Idle] Started');
       useTimerStore.getState().startIdle(data.seconds);
+
+      // Check user setting for idle notes
+      try {
+        const profile = await fetchMyProfile();
+        const setting = profile.idleNotesSetting || "Disabled";
+        
+        if (setting === "Enable But Not Mandatory") {
+          useUiStore.getState().openNoteModal(false);
+        } else if (setting === "Enabled & Mandatory") {
+          useUiStore.getState().openNoteModal(true);
+        }
+      } catch (err) {
+        console.error("Failed to fetch profile for idle notes check", err);
+      }
     });
     const unsubscribeStop = window.electronAPI.onIdleStopped(() => {
       console.log('[Idle] Stopped');

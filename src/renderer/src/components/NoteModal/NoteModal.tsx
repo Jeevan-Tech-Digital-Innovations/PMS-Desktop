@@ -10,6 +10,7 @@ const MAX_CHARS = 120;
 export function NoteModal() {
   const showNoteModal = useUiStore((s) => s.showNoteModal);
   const closeNoteModal = useUiStore((s) => s.closeNoteModal);
+  const isNoteModalMandatory = useUiStore((s) => s.isNoteModalMandatory);
   const activeTimeLog = useProjectStore((s) => s.activeTimeLog);
 
   const [noteText, setNoteText] = useState('');
@@ -52,13 +53,15 @@ export function NoteModal() {
   if (!showNoteModal) return null;
 
   return (
-    <div className={styles.overlay}>
-      <div className={styles.modal}>
+    <div className={styles.overlay} onClick={!isNoteModalMandatory ? closeNoteModal : undefined}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
           <h2>Add Note</h2>
-          <button className={styles.closeBtn} onClick={closeNoteModal}>
-            &times;
-          </button>
+          {!isNoteModalMandatory && (
+            <button className={styles.closeBtn} onClick={closeNoteModal}>
+              &times;
+            </button>
+          )}
         </div>
 
         <div className={styles.body}>
@@ -76,9 +79,15 @@ export function NoteModal() {
         </div>
 
         <div className={styles.footer}>
-          <button className={styles.backBtn} onClick={closeNoteModal} disabled={isSaving}>
-            Back
-          </button>
+          {!isNoteModalMandatory && (
+            <button
+              className={styles.backBtn}
+              onClick={closeNoteModal}
+              disabled={isSaving}
+            >
+              Back
+            </button>
+          )}
           <button className={styles.saveBtn} onClick={handleSave} disabled={isSaving}>
             {isSaving ? 'Saving...' : 'Save'}
           </button>

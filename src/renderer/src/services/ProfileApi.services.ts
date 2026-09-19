@@ -9,6 +9,7 @@ export interface EmployeeProfile {
   displayName: string;
   role: string;
   roles: string[];
+  idleNotesSetting?: string;
 }
 
 export interface Company {
