@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useTimerStore } from '@/stores/timerStore';
 import { useProjectStore } from '@/stores/projectStore';
-import { startTimeLog, getPreviousSecondsTodayForTask } from '@/pages/TimeTracking/TimeTrackingApi.services';
+import { startTimeLog, getPreviousSecondsForTask } from '@/pages/TimeTracking/TimeTrackingApi.services';
 import { markLocalTimerStart } from '@/hooks/useTimerSync';
 
 export function useStartTimeLog() {
@@ -20,7 +20,7 @@ export function useStartTimeLog() {
       // Must be called BEFORE startTimer to cover the API propagation delay.
       markLocalTimerStart();
 
-      const previousSecondsToday = await getPreviousSecondsTodayForTask(variables.taskId);
+      const previousSecondsToday = await getPreviousSecondsForTask(variables.taskId);
       startTimer(previousSecondsToday);
 
       window.electronAPI?.startTimer({

@@ -70,7 +70,7 @@ export async function getActiveTimeLog() {
  * Uses durationMinutes from each completed log as the primary source
  * (already computed server-side), falling back to startTime/endTime arithmetic.
  */
-export async function getPreviousSecondsTodayForTask(
+export async function getPreviousSecondsForTask(
   taskId: number | string,
 ): Promise<number> {
   if (!taskId) return 0;
@@ -88,13 +88,6 @@ export async function getPreviousSecondsTodayForTask(
 
     if (!Array.isArray(logs) || logs.length === 0) return 0;
 
-    const now = new Date();
-    const startOfToday = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-    ).getTime();
-
     let previousSecondsToday = 0;
     for (const log of logs) {
       // Only count completed logs (endTime present) for this task
@@ -111,16 +104,15 @@ export async function getPreviousSecondsTodayForTask(
         };
 
         const logStart = parseLogTime(log.startTime);
-        if (logStart >= startOfToday) {
-          if (log.durationMinutes != null && log.durationMinutes > 0) {
-            // Use server-computed duration (most accurate)
-            previousSecondsToday += log.durationMinutes * 60;
-          } else {
-            // Fallback: compute from timestamps
-            const logEnd = parseLogTime(log.endTime);
-            if (logEnd > logStart) {
-              previousSecondsToday += Math.floor((logEnd - logStart) / 1000);
-            }
+        
+        if (log.durationMinutes != null && log.durationMinutes > 0) {
+          // Use server-computed duration (most accurate)
+          previousSecondsToday += log.durationMinutes * 60;
+        } else {
+          // Fallback: compute from timestamps
+          const logEnd = parseLogTime(log.endTime);
+          if (logEnd > logStart) {
+            previousSecondsToday += Math.floor((logEnd - logStart) / 1000);
           }
         }
       }

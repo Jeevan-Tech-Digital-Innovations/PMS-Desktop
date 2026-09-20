@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { useTimerStore } from '@/stores/timerStore';
 import { useProjectStore } from '@/stores/projectStore';
-import { getActiveTimeLog, getPreviousSecondsTodayForTask } from '@/pages/TimeTracking/TimeTrackingApi.services';
+import { getActiveTimeLog, getPreviousSecondsForTask } from '@/pages/TimeTracking/TimeTrackingApi.services';
 
 // Module-level timestamp — only set when the USER explicitly clicks Start locally.
 // The sync must NOT set this when it auto-starts from a web-detected timer.

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useProjectStore } from '@/stores/projectStore';
@@ -41,12 +41,18 @@ export function Projects() {
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const queryClient = useQueryClient();
 
-  const queryKey = ['projects', search, userId];
+  const queryKey = ['projects', userId];
 
   const { data: projects = [], isLoading, refetch, isRefetching } = useQuery({
     queryKey,
-    queryFn: () => fetchProjects(search, userId),
+    queryFn: () => fetchProjects(undefined, userId),
   });
+
+  const displayedProjects = useMemo(() => {
+    if (!search.trim()) return projects;
+    const q = search.toLowerCase();
+    return projects.filter((p) => p.name.toLowerCase().includes(q));
+  }, [projects, search]);
 
   const handleRefresh = async () => {
     setIsManualRefreshing(true);
@@ -84,10 +90,10 @@ export function Projects() {
       <div className={styles.list}>
         {isLoading ? (
           <p className={styles.loading}>Loading projects...</p>
-        ) : projects.length === 0 ? (
+        ) : displayedProjects.length === 0 ? (
           <p className={styles.empty}>No projects found</p>
         ) : (
-          projects.map((project) => (
+          displayedProjects.map((project) => (
             <button
               key={project.id}
               className={styles.card}
