@@ -41,9 +41,8 @@ apiClient.interceptors.response.use(
       try {
         const data = await window.electronAPI!.refreshSession({ axisApiUrl: config.AXIS_API_URL });
 
-        // Our new Identity Service returns { data: { accessToken, ... } } or just { accessToken } depending on payload shape.
-        // Let's assume it returns { accessToken, user }
-        const newAccessToken = data.accessToken || data.data?.accessToken;
+        // authStore.refreshSession() directly returns the newAccessToken string
+        const newAccessToken = typeof data === 'string' ? data : (data.accessToken || data.data?.accessToken);
 
         if (newAccessToken) {
           const currentUser = useAuthStore.getState().user;

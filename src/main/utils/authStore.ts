@@ -64,30 +64,24 @@ export const authStore = {
   },
 
   async refreshSession(): Promise<string> {
-    const { session } = require('electron');
-    const axisApiUrl = import.meta.env.VITE_AXIS_API_URL || 'http://localhost:8081/api';
-    
-    // We must check all cookies because the cookie might be set on the web URL domain instead of the API URL domain
-    const cookies = await session.defaultSession.cookies.get({});
-    const refreshCookie = cookies.find((c: any) => c.name === 'axis_refresh_staging' || c.name === 'axis_refresh');
-    
-    if (!refreshCookie) {
-      throw new Error('No refresh cookie found');
+    const refreshToken = store.get('refreshToken');
+    if (!refreshToken) {
+      throw new Error('No refresh token found in store');
     }
 
-    const confirmUrl = axisApiUrl.replace(/\/api\/?$/, '/api/v1') + '/auth/confirm-access';
+    const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
+    const refreshUrl = `${apiUrl}/auth/refresh-token`;
     
-    const https = require('https');
     const axios = require('axios');
+    const https = require('https');
     const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 
-    const response = await axios.post(confirmUrl, {}, {
+    const response = await axios.post(refreshUrl, { refreshToken }, {
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'Cookie': `axis_refresh=${refreshCookie.value}`
       },
-      httpsAgent: confirmUrl.startsWith('https') ? httpsAgent : undefined,
+      httpsAgent: refreshUrl.startsWith('https') ? httpsAgent : undefined,
       validateStatus: () => true // Handle all statuses
     });
     
@@ -96,8 +90,6 @@ export const authStore = {
       const newAccessToken = data.accessToken || data.data?.accessToken;
       if (newAccessToken) {
         store.set('accessToken', newAccessToken);
-        // Inform the renderer that the token has changed! Wait, we can't easily IPC back, 
-        // but next time renderer fetches or reloads, it gets from authStore
         return newAccessToken;
       }
       throw new Error('Refresh session did not return an access token');
