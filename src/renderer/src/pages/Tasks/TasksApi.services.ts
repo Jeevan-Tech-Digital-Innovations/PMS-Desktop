@@ -222,52 +222,8 @@ export async function fetchAssignedItems(
     extractNested(t);
   }
 
-  // 4. Iteratively query /tasks/${id}/subtasks up to 4+ levels deep to guarantee NO subtask is missed
-  const fetchedParentIds = new Set<number>();
-
-  for (let depth = 1; depth <= 4; depth++) {
-    const tasksToFetch = Array.from(taskMap.values()).filter(
-      (t) => !fetchedParentIds.has(t.id)
-    );
-    if (tasksToFetch.length === 0) break;
-
-    for (const t of tasksToFetch) {
-      fetchedParentIds.add(t.id);
-    }
-
-    let newFound = 0;
-    const batchSize = 10;
-    for (let i = 0; i < tasksToFetch.length; i += batchSize) {
-      const batch = tasksToFetch.slice(i, i + batchSize);
-      const settled = await Promise.allSettled(
-        batch.map((t) => apiClient.get<Task[]>(API_ENDPOINTS.SUB_TASKS(t.id)))
-      );
-
-      for (let j = 0; j < settled.length; j++) {
-        const outcome = settled[j];
-        const parentTask = batch[j];
-        if (outcome.status === 'fulfilled') {
-          const subData: any[] = Array.isArray(outcome.value.data)
-            ? outcome.value.data
-            : (outcome.value.data as any)?.content || [];
-
-          for (const s of subData) {
-            if (s) {
-              const subId = Number(s.id || s.projectTaskId);
-              if (subId && !taskMap.has(subId)) {
-                if (!s.parentTaskId) s.parentTaskId = parentTask.id;
-                addTask(s);
-                extractNested(s);
-                newFound++;
-              }
-            }
-          }
-        }
-      }
-    }
-
-    if (newFound === 0) break;
-  }
+  // 4. Iteratively querying subtasks is removed because the `/tasks` endpoint already 
+  // returns the complete task hierarchy including all subtasks in a single payload.
 
   // 5. Build assigned items list with level and parent title
   const result: AssignedItem[] = [];

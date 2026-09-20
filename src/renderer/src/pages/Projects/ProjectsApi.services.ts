@@ -3,7 +3,8 @@ import { Project } from '@/types/project';
 import { API_ENDPOINTS } from '@/utils/constants';
 
 export async function fetchProjects(search?: string, userId?: string | number): Promise<Project[]> {
-  const params: any = search ? { search } : {};
+  const params: any = { includeStats: false };
+  if (search) params.search = search;
   const { data } = await apiClient.get<Project[]>(API_ENDPOINTS.PROJECTS, { params });
   const allProjects: Project[] = Array.isArray(data) ? data : (data as any).content || [];
 
