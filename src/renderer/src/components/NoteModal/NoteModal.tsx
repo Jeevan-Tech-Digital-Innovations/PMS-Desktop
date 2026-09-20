@@ -53,15 +53,13 @@ export function NoteModal() {
   if (!showNoteModal) return null;
 
   return (
-    <div className={styles.overlay} onClick={!isNoteModalMandatory ? closeNoteModal : undefined}>
+    <div className={styles.overlay} onClick={closeNoteModal}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
           <h2>Add Note</h2>
-          {!isNoteModalMandatory && (
-            <button className={styles.closeBtn} onClick={closeNoteModal}>
-              &times;
-            </button>
-          )}
+          <button className={styles.closeBtn} onClick={closeNoteModal}>
+            &times;
+          </button>
         </div>
 
         <div className={styles.body}>
@@ -79,7 +77,6 @@ export function NoteModal() {
         </div>
 
         <div className={styles.footer}>
-          {!isNoteModalMandatory && (
             <button
               className={styles.backBtn}
               onClick={closeNoteModal}
@@ -87,7 +84,6 @@ export function NoteModal() {
             >
               Back
             </button>
-          )}
           <button className={styles.saveBtn} onClick={handleSave} disabled={isSaving}>
             {isSaving ? 'Saving...' : 'Save'}
           </button>
