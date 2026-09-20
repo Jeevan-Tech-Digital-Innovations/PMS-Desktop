@@ -397,9 +397,8 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.AUTH_REFRESH_SESSION, async (_, urls: { axisApiUrl: string }) => {
     try {
-      const domain = new URL(urls.axisApiUrl).hostname;
-      // Use default session to find the refresh cookie
-      const cookies = await session.defaultSession.cookies.get({ domain });
+      // Use default session to find the refresh cookie valid for the specific API URL
+      const cookies = await session.defaultSession.cookies.get({ url: urls.axisApiUrl });
       const refreshCookie = cookies.find(c => c.name === 'axis_refresh_staging' || c.name === 'axis_refresh');
 
       if (!refreshCookie) {

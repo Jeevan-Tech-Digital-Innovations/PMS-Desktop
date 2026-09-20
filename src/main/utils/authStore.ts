@@ -65,11 +65,10 @@ export const authStore = {
 
   async refreshSession(): Promise<string> {
     const { session } = require('electron');
-    const axisApiUrl = process.env.VITE_AXIS_API_URL || 'http://localhost:8081/api';
-    const domain = new URL(axisApiUrl).hostname;
+    const axisApiUrl = import.meta.env.VITE_AXIS_API_URL || 'http://localhost:8081/api';
     
-    // Use default session to find the axis_refresh_staging cookie
-    const cookies = await session.defaultSession.cookies.get({ domain });
+    // Use default session to find the refresh cookie valid for the specific API URL
+    const cookies = await session.defaultSession.cookies.get({ url: axisApiUrl });
     const refreshCookie = cookies.find((c: any) => c.name === 'axis_refresh_staging' || c.name === 'axis_refresh');
     
     if (!refreshCookie) {
