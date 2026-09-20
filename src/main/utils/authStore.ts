@@ -64,33 +64,27 @@ export const authStore = {
   },
 
   async refreshSession(): Promise<string> {
-    const { session } = require('electron');
+    const { net } = require('electron');
     const axisApiUrl = import.meta.env.VITE_AXIS_API_URL || 'http://localhost:8081/api';
+    const confirmUrl = axisApiUrl.replace(/\/api\/?$/, '/api/v1') + '/auth/confirm-access';
     
-    // We must check all cookies because the cookie might be set on the web URL domain instead of the API URL domain
-    const cookies = await session.defaultSession.cookies.get({});
-    const refreshCookie = cookies.find((c: any) => c.name === 'axis_refresh_staging' || c.name === 'axis_refresh');
+    // We don't need to manually extract and send cookies!
+    // By using Electron's native net.fetch with credentials: 'include', Chromium handles everything:
+    // 1. Automatically attaches the correct axis_refresh cookie (and JSESSIONID if needed).
+    // 2. Automatically processes any Set-Cookie headers for refresh token rotation!
     
-    const https = require('https');
-    const axios = require('axios');
-    const httpsAgent = new https.Agent({ rejectUnauthorized: false });
-    
-    if (refreshCookie) {
-      // SSO Refresh
-      const confirmUrl = axisApiUrl.replace(/\/api\/?$/, '/api/v1') + '/auth/confirm-access';
-      const response = await axios.post(confirmUrl, {}, {
+    try {
+      const response = await net.fetch(confirmUrl, {
+        method: 'POST',
         headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Cookie': `axis_refresh=${refreshCookie.value}`
+          'Accept': 'application/json'
         },
-        httpsAgent: confirmUrl.startsWith('https') ? httpsAgent : undefined,
-        validateStatus: () => true
+        credentials: 'include'
       });
       
-      if (response.status >= 200 && response.status < 300) {
-        const data = response.data;
-        const newAccessToken = data.accessToken || data.data?.accessToken;
+      if (response.ok) {
+        const data = await response.json();
+        const newAccessToken = data.access_token || data.accessToken || data.data?.accessToken;
         if (newAccessToken) {
           store.set('accessToken', newAccessToken);
           return newAccessToken;
@@ -99,11 +93,11 @@ export const authStore = {
       } else {
         throw new Error(`Refresh failed with status: ${response.status}`);
       }
-    } else {
-      // Local Refresh Fallback
+    } catch (err: any) {
+      // Fallback for network errors or if confirm-access fails completely
       const { refreshToken } = authStore.getTokens();
       if (!refreshToken) {
-        throw new Error('No refresh cookie found and no local refresh token stored');
+        throw err; // Re-throw the confirm-access error if no local fallback is possible
       }
       
       const localApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';

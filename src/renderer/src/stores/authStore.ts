@@ -97,10 +97,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         typeof window.electronAPI?.getStoredUser === 'function'
           ? await window.electronAPI.getStoredUser()
           : null;
-      if (tokens?.accessToken && tokens?.refreshToken) {
+      if (tokens?.accessToken) {
         set({
           accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken,
+          refreshToken: tokens.refreshToken || '',
           user: user ?? null,
           isAuthenticated: true,
         });
