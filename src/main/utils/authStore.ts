@@ -67,8 +67,8 @@ export const authStore = {
     const { session } = require('electron');
     const axisApiUrl = import.meta.env.VITE_AXIS_API_URL || 'http://localhost:8081/api';
     
-    // Use default session to find the refresh cookie valid for the specific API URL
-    const cookies = await session.defaultSession.cookies.get({ url: axisApiUrl });
+    // We must check all cookies because the cookie might be set on the web URL domain instead of the API URL domain
+    const cookies = await session.defaultSession.cookies.get({});
     const refreshCookie = cookies.find((c: any) => c.name === 'axis_refresh_staging' || c.name === 'axis_refresh');
     
     if (!refreshCookie) {
@@ -76,16 +76,23 @@ export const authStore = {
     }
 
     const confirmUrl = axisApiUrl.replace(/\/api\/?$/, '/api/v1') + '/auth/confirm-access';
-    const response = await fetch(confirmUrl, {
-      method: 'POST',
-      headers: { 
+    
+    const https = require('https');
+    const axios = require('axios');
+    const httpsAgent = new https.Agent({ rejectUnauthorized: false });
+
+    const response = await axios.post(confirmUrl, {}, {
+      headers: {
+        'Accept': 'application/json',
         'Content-Type': 'application/json',
         'Cookie': `axis_refresh=${refreshCookie.value}`
-      }
+      },
+      httpsAgent: confirmUrl.startsWith('https') ? httpsAgent : undefined,
+      validateStatus: () => true // Handle all statuses
     });
     
-    if (response.ok) {
-      const data = await response.json();
+    if (response.status >= 200 && response.status < 300) {
+      const data = response.data;
       const newAccessToken = data.accessToken || data.data?.accessToken;
       if (newAccessToken) {
         store.set('accessToken', newAccessToken);

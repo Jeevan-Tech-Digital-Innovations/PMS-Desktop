@@ -77,9 +77,9 @@ apiClient.interceptors.response.use(
         // or if the refresh cookie is missing. 
         // Do NOT log out for 404 (Staging bug), 500, or Network Errors!
         const msg = refreshError.message || String(refreshError);
-        const isAuthRejection = msg.includes('status: 401') || 
-                                msg.includes('status: 403') || 
-                                msg.includes('status: 400') ||
+        const isAuthRejection = msg.includes('Refresh failed with status: 401') || 
+                                msg.includes('Refresh failed with status: 403') || 
+                                msg.includes('Refresh failed with status: 400') ||
                                 msg.includes('No refresh cookie found');
 
         if (isAuthRejection) {
