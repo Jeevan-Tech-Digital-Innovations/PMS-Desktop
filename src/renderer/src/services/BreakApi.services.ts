@@ -1,7 +1,7 @@
 import { apiClient } from './apiClient';
 
 export interface BreakReason {
-  id: number;
+  id: string;
   reasonText: string;
 }
 
@@ -10,7 +10,7 @@ export const getBreakReasons = async () => {
   return response.data;
 };
 
-export const startBreak = async (timeLogId: number, breakReasonId: number) => {
+export const startBreak = async (timeLogId: number, breakReasonId: string) => {
   const response = await apiClient.post(
     `/tasks/time-logs/${timeLogId}/breaks/start`,
     { breakReasonId }

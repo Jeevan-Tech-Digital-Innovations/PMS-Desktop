@@ -36,7 +36,7 @@ export function BreakModal() {
     }
   };
 
-  const handleSelectReason = async (reasonId: number) => {
+  const handleSelectReason = async (reasonId: string) => {
     if (!activeTimeLog) {
       toast.error('No active time log found');
       return;

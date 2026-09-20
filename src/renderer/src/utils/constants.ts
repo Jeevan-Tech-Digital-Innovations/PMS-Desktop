@@ -35,19 +35,3 @@ export const API_ENDPOINTS = {
 // UI thresholds
 export const TIMER_TICK_INTERVAL_MS = 1000; // 1 second
 
-// Available break reasons (fallback if API fails)
-export const DEFAULT_BREAK_REASONS = [
-  { id: 1, reasonText: 'Lunch Break' },
-  { id: 2, reasonText: 'Morning Tea Break' },
-  { id: 3, reasonText: 'Evening Tea Break' },
-  { id: 4, reasonText: 'Discussion Break' },
-  { id: 5, reasonText: 'Meeting Break' },
-  { id: 6, reasonText: 'Internal Discussion' },
-  { id: 7, reasonText: 'Client Discussion' },
-  { id: 8, reasonText: 'Team Meeting' },
-  { id: 9, reasonText: 'Client Call' },
-  { id: 10, reasonText: 'KT Session' },
-  { id: 11, reasonText: 'Training / Learning' },
-  { id: 12, reasonText: 'Research & Analysis' },
-  { id: 13, reasonText: 'Waiting for Input' },
-] as const;
