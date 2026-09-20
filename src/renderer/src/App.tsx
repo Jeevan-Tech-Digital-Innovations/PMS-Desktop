@@ -21,21 +21,8 @@ import { AuthLayout } from '@/layout/AuthLayout/AuthLayout';
 import { AppLayout } from '@/layout/AppLayout/AppLayout';
 
 // Auth guards
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const isLoading = useAuthStore((s) => s.isLoading);
-  if (isLoading) return null;
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
-  return <>{children}</>;
-}
-
-function PublicRoute({ children }: { children: React.ReactNode }) {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const isLoading = useAuthStore((s) => s.isLoading);
-  if (isLoading) return null;
-  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
-  return <>{children}</>;
-}
+import LoginGuard from '@/components/LoginGuard/LoginGuard';
+import AuthGuard from '@/components/AuthGuard/AuthGuard';
 
 export default function App() {
   const navigate = useNavigate();
@@ -156,30 +143,22 @@ export default function App() {
       <Toaster position="top-right" />
       <Routes>
         {/* Public routes */}
-        <Route
-          element={
-            <PublicRoute>
-              <AuthLayout />
-            </PublicRoute>
-          }
-        >
-          <Route path="/login" element={<Login />} />
+        <Route element={<LoginGuard />}>
+          <Route element={<AuthLayout />}>
+            <Route path="/login" element={<Login />} />
+          </Route>
         </Route>
 
         {/* Protected routes */}
-        <Route
-          element={
-            <ProtectedRoute>
-              <AppLayout />
-            </ProtectedRoute>
-          }
-        >
+        <Route element={<AuthGuard />}>
+          <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/tasks/:projectId" element={<Tasks />} />
           <Route path="/tracking" element={<TimeTracking />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/profile" element={<Profile />} />
+          </Route>
         </Route>
 
         {/* Default redirect */}
