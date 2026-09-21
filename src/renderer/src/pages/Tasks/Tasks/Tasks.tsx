@@ -59,11 +59,16 @@ const ItemCard = ({ item, isSelected, onSelect }: ItemCardProps) => (
         <span className={styles.parentText}>{item.parentTaskTitle}</span>
       </div>
     )}
-    <span className={styles.meta}>
-      {item.startDate ? `Start: ${item.startDate}` : `Start: -`}
-      {' · '}
-      {item.dueDate ? `Due: ${item.dueDate}` : `Due: -`}
-    </span>
+    <div className={styles.meta}>
+      <div>
+        {item.startDate ? `Start: ${item.startDate}` : `Start: -`}
+        {' · '}
+        {item.dueDate ? `Due: ${item.dueDate}` : `Due: -`}
+      </div>
+      <div style={{ marginTop: '4px' }}>
+        {item.status ? `Status: ${item.status}` : `Status: -`}
+      </div>
+    </div>
   </button>
 );
 
