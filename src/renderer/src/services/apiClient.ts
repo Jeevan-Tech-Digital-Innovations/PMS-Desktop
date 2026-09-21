@@ -57,10 +57,11 @@ apiClient.interceptors.response.use(
             } as any;
           }
 
+          const currentRefreshToken = useAuthStore.getState().refreshToken;
           useAuthStore.getState().setAuth({
             user: nextUser as any,
             accessToken: newAccessToken,
-            refreshToken: '', // Refresh token is now in a secure cookie, not state
+            refreshToken: currentRefreshToken || '', // Preserve existing value; token is managed via Set-Cookie by Axis
             rememberMe: true, // Preserve remember me state
           });
 

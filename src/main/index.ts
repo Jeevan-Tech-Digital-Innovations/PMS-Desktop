@@ -416,6 +416,29 @@ function registerIpcHandlers(): void {
 
       const contentType = response.headers.get('content-type') || '';
       if (response.ok) {
+        // CRITICAL: native fetch() does NOT auto-persist Set-Cookie headers into Electron's session.
+        // Axis rotates the axis_refresh cookie on EVERY confirm-access call (token rotation).
+        // If we don't manually save the new cookie, the next refresh will send the OLD (already
+        // invalidated) cookie and Axis will reject it with 401 — causing a logout.
+        const setCookieHeader = response.headers.get('set-cookie');
+        if (setCookieHeader) {
+          const cookieMatch = setCookieHeader.match(/(?:axis_refresh_staging|axis_refresh)=([^;]+)/i);
+          if (cookieMatch) {
+            const cookieName = setCookieHeader.toLowerCase().includes('axis_refresh_staging')
+              ? 'axis_refresh_staging'
+              : 'axis_refresh';
+            await session.defaultSession.cookies.set({
+              url: urls.axisApiUrl,
+              name: cookieName,
+              value: cookieMatch[1],
+              httpOnly: true,
+              secure: urls.axisApiUrl.startsWith('https'),
+            });
+            console.log(`[Auth] Rotated ${cookieName} cookie saved to Electron session.`);
+          }
+        } else {
+          console.warn('[Auth] No Set-Cookie header in confirm-access response — Axis may not have rotated the token.');
+        }
         return await response.json();
       } else {
         // If the response is not JSON, it's likely a proxy/firewall interception (common on screen lock)

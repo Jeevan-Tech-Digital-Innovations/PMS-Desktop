@@ -67,12 +67,12 @@ export const authStore = {
     const { net } = require('electron');
     const axisApiUrl = import.meta.env.VITE_AXIS_API_URL || 'http://localhost:8081/api';
     const confirmUrl = axisApiUrl.replace(/\/api\/?$/, '/api/v1') + '/auth/confirm-access';
-    
+
     // We don't need to manually extract and send cookies!
     // By using Electron's native net.fetch with credentials: 'include', Chromium handles everything:
     // 1. Automatically attaches the correct axis_refresh cookie (and JSESSIONID if needed).
     // 2. Automatically processes any Set-Cookie headers for refresh token rotation!
-    
+
     try {
       const response = await net.fetch(confirmUrl, {
         method: 'POST',
@@ -81,7 +81,7 @@ export const authStore = {
         },
         credentials: 'include'
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         const newAccessToken = data.access_token || data.accessToken || data.data?.accessToken;
@@ -99,10 +99,10 @@ export const authStore = {
       if (!refreshToken) {
         throw err; // Re-throw the confirm-access error if no local fallback is possible
       }
-      
+
       const localApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
       const refreshUrl = `${localApiUrl}/auth/refresh-token`;
-      
+
       const response = await axios.post(refreshUrl, { refreshToken }, {
         headers: {
           'Accept': 'application/json',
@@ -111,14 +111,14 @@ export const authStore = {
         httpsAgent: refreshUrl.startsWith('https') ? httpsAgent : undefined,
         validateStatus: () => true
       });
-      
+
       if (response.status >= 200 && response.status < 300) {
         const data = response.data;
         // Depending on how local API structures it, usually { accessToken, refreshToken }
         // or { data: { accessToken, refreshToken } }
         const newAccessToken = data.accessToken || data.data?.accessToken;
         const newRefreshToken = data.refreshToken || data.data?.refreshToken;
-        
+
         if (newAccessToken) {
           store.set('accessToken', newAccessToken);
           if (newRefreshToken) {
