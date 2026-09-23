@@ -88,7 +88,7 @@ function createWindow(): void {
   });
 
   // Minimize to tray instead of closing
-  mainWindow.on('close', (e) => {
+  mainWindow.on('close', (e: any) => {
     if (!(app as any).isQuitting) {
       e.preventDefault();
       mainWindow?.hide();
@@ -103,7 +103,7 @@ function createWindow(): void {
   }
 
   // F12 to toggle DevTools in production
-  mainWindow.webContents.on('before-input-event', (_, input) => {
+  mainWindow.webContents.on('before-input-event', (_: any, input: any) => {
     if (input.key === 'F12' && input.type === 'keyDown') {
       mainWindow?.webContents.toggleDevTools();
     }
@@ -190,7 +190,7 @@ async function captureAndUploadScreenshot(timeLogId: number): Promise<void> {
   } catch (err) {
     logger.error('Failed to fetch employee settings for screenshot', err);
   }
-  
+
   // Apply Blur if enabled
   if (employeeSettings.screenshotBlur === 'On') {
     try {
@@ -234,12 +234,12 @@ async function captureAndUploadScreenshot(timeLogId: number): Promise<void> {
 function registerIpcHandlers(): void {
   // Auth
   ipcMain.handle(IPC.AUTH_GET_TOKENS, () => authStore.getStartupTokens());
-  ipcMain.handle(IPC.AUTH_SAVE_TOKENS, (_, data) => authStore.saveTokens(data));
+  ipcMain.handle(IPC.AUTH_SAVE_TOKENS, (_: any, data: any) => authStore.saveTokens(data));
   ipcMain.handle(IPC.AUTH_CLEAR_TOKENS, () => authStore.clearTokens());
   ipcMain.handle(IPC.AUTH_GET_USER, () => authStore.getUser());
-  ipcMain.handle(IPC.AUTH_SAVE_USER, (_, data) => authStore.saveUser(data));
+  ipcMain.handle(IPC.AUTH_SAVE_USER, (_: any, data: any) => authStore.saveUser(data));
 
-  ipcMain.handle(IPC.AUTH_LOGIN_SSO, async (_, urls: { axisWebUrl: string, axisApiUrl: string }) => {
+  ipcMain.handle(IPC.AUTH_LOGIN_SSO, async (_: any, urls: { axisWebUrl: string, axisApiUrl: string }) => {
     return new Promise((resolve, reject) => {
       const isDev = !app.isPackaged;
       const authWindow = new BrowserWindow({
@@ -260,7 +260,7 @@ function registerIpcHandlers(): void {
 
       const domain = new URL(urls.axisApiUrl).hostname;
 
-      authWindow.webContents.on('did-fail-load', (e, errorCode, errorDescription) => {
+      authWindow.webContents.on('did-fail-load', (e: any, errorCode: number, errorDescription: string) => {
         console.error('authWindow failed to load:', errorCode, errorDescription);
         if (!isResolved) {
           isResolved = true;
@@ -268,8 +268,8 @@ function registerIpcHandlers(): void {
           reject(new Error(`Login page failed to load: ${errorDescription} (Code: ${errorCode})`));
         }
       });
-      
-      authWindow.webContents.on('did-fail-provisional-load', (e, errorCode, errorDescription) => {
+
+      authWindow.webContents.on('did-fail-provisional-load', (e: any, errorCode: number, errorDescription: string) => {
         console.error('authWindow failed provisional load:', errorCode, errorDescription);
         if (!isResolved) {
           isResolved = true;
@@ -278,7 +278,7 @@ function registerIpcHandlers(): void {
         }
       });
 
-      authWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+      authWindow.webContents.on('console-message', (event: any, level: number, message: string, line: number, sourceId: string) => {
         console.log(`[authWindow console] level: ${level} message: ${message} line: ${line} sourceId: ${sourceId}`);
       });
 
@@ -312,12 +312,12 @@ function registerIpcHandlers(): void {
             for (let i = 0; i < 25; i++) {
               // We must check all cookies because the cookie might be set on the web URL domain instead of the API URL domain
               const cookies = await authWindow.webContents.session.cookies.get({});
-              foundCookieNames = cookies.map(c => c.name);
-              const refresh = cookies.find(c => c.name === 'axis_refresh_staging' || c.name === 'axis_refresh');
+              foundCookieNames = cookies.map((c: any) => c.name);
+              const refresh = cookies.find((c: any) => c.name === 'axis_refresh_staging' || c.name === 'axis_refresh');
               if (refresh) {
                 refreshCookie = refresh;
                 // Force alias the cookie to 'axis_refresh' so the API can read it
-                let cookiesToSend = cookies.map(c => `${c.name}=${c.value}`);
+                let cookiesToSend = cookies.map((c: any) => `${c.name}=${c.value}`);
                 if (refresh.name !== 'axis_refresh') {
                   cookiesToSend.push(`axis_refresh=${refresh.value}`);
                 }
@@ -330,7 +330,7 @@ function registerIpcHandlers(): void {
             if (refreshCookie) {
               // Call Axis API to confirm access using the cookie
               const confirmUrl = urls.axisApiUrl.replace(/\/api\/?$/, '/api/v1') + '/auth/confirm-access';
-              
+
               // Use axios with built-in https agent to bypass strict corporate proxy SSL certificate checks
               const https = require('https');
               const axios = require('axios');
@@ -346,6 +346,30 @@ function registerIpcHandlers(): void {
               });
 
               if (response.status >= 200 && response.status < 300) {
+                // --- NEW CODE: Persist the rotated cookie from SSO ---
+                const setCookieRaw = response.headers['set-cookie'];
+                if (setCookieRaw) {
+                  // Normalize to array (Axios usually returns array, but safe fallback)
+                  const setCookieArray = Array.isArray(setCookieRaw) ? setCookieRaw : [setCookieRaw];
+                  for (const cookieStr of setCookieArray) {
+                    const cookieMatch = cookieStr.match(/(?:axis_refresh_staging|axis_refresh)=([^;]+)/i);
+                    if (cookieMatch) {
+                      const cookieName = cookieStr.toLowerCase().includes('axis_refresh_staging')
+                        ? 'axis_refresh_staging' : 'axis_refresh';
+                      await session.defaultSession.cookies.set({
+                        url: urls.axisApiUrl,
+                        name: cookieName,
+                        value: cookieMatch[1],
+                        path: '/',
+                        httpOnly: true,
+                        secure: urls.axisApiUrl.startsWith('https'),
+                      });
+                      console.log(`[Auth] SSO Rotated ${cookieName} cookie saved to Electron session.`);
+                    }
+                  }
+                }
+                // --- END NEW CODE ---
+
                 const data = response.data;
                 authWindow.close();
                 resolve(data);
@@ -359,27 +383,27 @@ function registerIpcHandlers(): void {
           } catch (err: any) {
             console.error('SSO confirmation failed:', err);
             authWindow.close();
-            
+
             // Extract axios error message if available
             let errorMsg = err.message || String(err);
             if (err.response) {
-               errorMsg = `Status ${err.response.status}: ${JSON.stringify(err.response.data)}`;
+              errorMsg = `Status ${err.response.status}: ${JSON.stringify(err.response.data)}`;
             }
-            
+
             reject(new Error(`Failed to obtain session via SSO: ${errorMsg}`));
             return;
           }
         }
       };
 
-      authWindow.webContents.on('will-navigate', (event, url) => {
+      authWindow.webContents.on('will-navigate', (event: any, url: string) => {
         if (url.startsWith(redirectUri) && !isResolved) {
           event.preventDefault(); // Stop the Axis UI from loading the callback route
           handleNavigation(url);
         }
       });
 
-      authWindow.webContents.on('did-redirect-navigation', (event, url) => {
+      authWindow.webContents.on('did-redirect-navigation', (event: any, url: string) => {
         if (url.startsWith(redirectUri) && !isResolved) {
           // Cannot preventDefault on did-redirect, but we can stop loading
           authWindow.webContents.stop();
@@ -395,68 +419,12 @@ function registerIpcHandlers(): void {
     });
   });
 
-  ipcMain.handle(IPC.AUTH_REFRESH_SESSION, async (_, urls: { axisApiUrl: string }) => {
-    try {
-      // Use default session to find the refresh cookie valid for the specific API URL
-      const cookies = await session.defaultSession.cookies.get({ url: urls.axisApiUrl });
-      const refreshCookie = cookies.find(c => c.name === 'axis_refresh_staging' || c.name === 'axis_refresh');
-
-      if (!refreshCookie) {
-        throw new Error('No refresh cookie found');
-      }
-
-      const confirmUrl = urls.axisApiUrl.replace(/\/api\/?$/, '/api/v1') + '/auth/confirm-access';
-      const response = await fetch(confirmUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cookie': `axis_refresh=${refreshCookie.value}`
-        }
-      });
-
-      const contentType = response.headers.get('content-type') || '';
-      if (response.ok) {
-        // CRITICAL: native fetch() does NOT auto-persist Set-Cookie headers into Electron's session.
-        // Axis rotates the axis_refresh cookie on EVERY confirm-access call (token rotation).
-        // If we don't manually save the new cookie, the next refresh will send the OLD (already
-        // invalidated) cookie and Axis will reject it with 401 — causing a logout.
-        const setCookieHeader = response.headers.get('set-cookie');
-        if (setCookieHeader) {
-          const cookieMatch = setCookieHeader.match(/(?:axis_refresh_staging|axis_refresh)=([^;]+)/i);
-          if (cookieMatch) {
-            const cookieName = setCookieHeader.toLowerCase().includes('axis_refresh_staging')
-              ? 'axis_refresh_staging'
-              : 'axis_refresh';
-            await session.defaultSession.cookies.set({
-              url: urls.axisApiUrl,
-              name: cookieName,
-              value: cookieMatch[1],
-              httpOnly: true,
-              secure: urls.axisApiUrl.startsWith('https'),
-            });
-            console.log(`[Auth] Rotated ${cookieName} cookie saved to Electron session.`);
-          }
-        } else {
-          console.warn('[Auth] No Set-Cookie header in confirm-access response — Axis may not have rotated the token.');
-        }
-        return await response.json();
-      } else {
-        // If the response is not JSON, it's likely a proxy/firewall interception (common on screen lock)
-        if (!contentType.includes('application/json')) {
-          throw new Error(`Network interception detected (Status: ${response.status})`);
-        }
-        
-        // Otherwise it's a real API rejection
-        throw new Error(`Refresh failed with status: ${response.status}`);
-      }
-    } catch (err) {
-      console.error('Session refresh failed:', err);
-      throw err;
-    }
+  ipcMain.handle(IPC.AUTH_REFRESH_SESSION, async (_: any, urls: { axisApiUrl: string }) => {
+    return await authStore.refreshSession(urls.axisApiUrl);
   });
 
   // Timer start
-  ipcMain.on(IPC.TIMER_START, (_, payload: { timeLogId: number; startTime: string }) => {
+  ipcMain.on(IPC.TIMER_START, (_: any, payload: { timeLogId: number; startTime: string }) => {
     startAllBackgroundServices(payload.timeLogId, payload.startTime);
   });
 
@@ -510,11 +478,11 @@ function registerIpcHandlers(): void {
       screenshotInterval = null;
     }
   });
-  
+
   ipcMain.on(IPC.BREAK_STOP, () => {
     resumeActivityMonitor();
     resumeIdleMonitor();
-    
+
     if (currentTimeLogId) {
       if (screenshotInterval) {
         clearInterval(screenshotInterval);
@@ -589,7 +557,7 @@ app.whenReady().then(() => {
   }
 
   // Ignore certificate errors for the Axis SSO login window behind corporate proxies
-  app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
+  app.on('certificate-error', (event: any, webContents: any, url: string, error: string, certificate: any, callback: any) => {
     event.preventDefault();
     callback(true);
   });

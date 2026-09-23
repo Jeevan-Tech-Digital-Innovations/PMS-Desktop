@@ -63,73 +63,81 @@ export const authStore = {
     store.set('user', null);
   },
 
-  async refreshSession(): Promise<string> {
-    const { net } = require('electron');
-    const axisApiUrl = import.meta.env.VITE_AXIS_API_URL || 'http://localhost:8081/api';
-    const confirmUrl = axisApiUrl.replace(/\/api\/?$/, '/api/v1') + '/auth/confirm-access';
+  refreshPromise: null as Promise<any> | null,
 
-    // We don't need to manually extract and send cookies!
-    // By using Electron's native net.fetch with credentials: 'include', Chromium handles everything:
-    // 1. Automatically attaches the correct axis_refresh cookie (and JSESSIONID if needed).
-    // 2. Automatically processes any Set-Cookie headers for refresh token rotation!
+  async refreshSession(axisApiUrl?: string): Promise<any> {
+    if (this.refreshPromise) return this.refreshPromise;
 
-    try {
-      const response = await net.fetch(confirmUrl, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json'
-        },
-        credentials: 'include'
-      });
+    const url = axisApiUrl || import.meta.env.VITE_AXIS_API_URL || 'http://localhost:8081/api';
 
-      if (response.ok) {
-        const data = await response.json();
-        const newAccessToken = data.access_token || data.accessToken || data.data?.accessToken;
-        if (newAccessToken) {
-          store.set('accessToken', newAccessToken);
-          return newAccessToken;
+    this.refreshPromise = (async () => {
+      try {
+        const { session } = require('electron');
+        const cookies = await session.defaultSession.cookies.get({ url });
+        const refreshCookie = cookies.find((c: any) => c.name === 'axis_refresh_staging' || c.name === 'axis_refresh');
+
+        if (!refreshCookie) {
+          return { success: false, statusCode: 0, message: 'No refresh cookie found' };
         }
-        throw new Error('Refresh session did not return an access token');
-      } else {
-        throw new Error(`Refresh failed with status: ${response.status}`);
-      }
-    } catch (err: any) {
-      // Fallback for network errors or if confirm-access fails completely
-      const { refreshToken } = authStore.getTokens();
-      if (!refreshToken) {
-        throw err; // Re-throw the confirm-access error if no local fallback is possible
-      }
 
-      const localApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
-      const refreshUrl = `${localApiUrl}/auth/refresh-token`;
-
-      const response = await axios.post(refreshUrl, { refreshToken }, {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        httpsAgent: refreshUrl.startsWith('https') ? httpsAgent : undefined,
-        validateStatus: () => true
-      });
-
-      if (response.status >= 200 && response.status < 300) {
-        const data = response.data;
-        // Depending on how local API structures it, usually { accessToken, refreshToken }
-        // or { data: { accessToken, refreshToken } }
-        const newAccessToken = data.accessToken || data.data?.accessToken;
-        const newRefreshToken = data.refreshToken || data.data?.refreshToken;
-
-        if (newAccessToken) {
-          store.set('accessToken', newAccessToken);
-          if (newRefreshToken) {
-            store.set('refreshToken', newRefreshToken);
+        const confirmUrl = url.replace(/\/api\/?$/, '/api/v1') + '/auth/confirm-access';
+        const response = await fetch(confirmUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cookie': `axis_refresh=${refreshCookie.value}`
           }
-          return newAccessToken;
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+
+        if (response.ok) {
+          // getSetCookie() is available in Node 18+ fetch and avoids comma-concatenation bugs
+          const setCookieArray = typeof response.headers.getSetCookie === 'function' 
+            ? response.headers.getSetCookie() 
+            : [response.headers.get('set-cookie')].filter(Boolean) as string[];
+          
+          if (setCookieArray && setCookieArray.length > 0) {
+            for (const cookieStr of setCookieArray) {
+              const cookieMatch = cookieStr.match(/(?:axis_refresh_staging|axis_refresh)=([^;]+)/i);
+              if (cookieMatch) {
+                const cookieName = cookieStr.toLowerCase().includes('axis_refresh_staging')
+                  ? 'axis_refresh_staging' : 'axis_refresh';
+                await session.defaultSession.cookies.set({
+                  url: url,
+                  name: cookieName,
+                  value: cookieMatch[1],
+                  path: '/',
+                  httpOnly: true,
+                  secure: url.startsWith('https'),
+                });
+                console.log(`[AuthStore] Rotated ${cookieName} cookie saved to Electron session.`);
+              }
+            }
+          } else {
+            console.warn('[AuthStore] No Set-Cookie header — Axis may not have rotated the token.');
+          }
+          
+          const data = await response.json();
+          const newAccessToken = data.access_token || data.accessToken || data.data?.accessToken;
+          if (newAccessToken) {
+            store.set('accessToken', newAccessToken);
+          }
+          return { success: true, ...data };
+        } else {
+          if (!contentType.includes('application/json')) {
+            return { success: false, statusCode: -1, message: `Network interception detected (Status: ${response.status})` };
+          }
+          return { success: false, statusCode: response.status, message: `Refresh failed with status: ${response.status}` };
         }
-        throw new Error('Local refresh session did not return an access token');
-      } else {
-        throw new Error(`Refresh failed with status: ${response.status}`);
+      } catch (err: any) {
+        console.error('[AuthStore] Session refresh failed:', err);
+        return { success: false, statusCode: -1, message: err.message || String(err) };
+      } finally {
+        this.refreshPromise = null;
       }
-    }
+    })();
+    
+    return this.refreshPromise;
   }
 };

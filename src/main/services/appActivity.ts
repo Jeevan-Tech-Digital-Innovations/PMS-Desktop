@@ -171,16 +171,34 @@ async function sendBatch(logId: number, events: AppActivityEvent[]): Promise<voi
 
     if (response.status === 401 || response.status === 403) {
       try {
-        logger.info('Access token expired, refreshing session...');
-        const newAccessToken = await authStore.refreshSession();
-        response = await fetch(`${API_BASE}/activity/apps/bulk`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${newAccessToken}`,
-          },
-          body: JSON.stringify(payload),
-        });
+        logger.info('Access token expired, refreshing session for app activity...');
+        const refreshResult = await authStore.refreshSession();
+        
+        if (refreshResult.success) {
+          const newAccessToken = refreshResult.access_token || refreshResult.accessToken || refreshResult.data?.accessToken;
+          response = await fetch(`${API_BASE}/activity/apps/bulk`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${newAccessToken}`,
+            },
+            body: JSON.stringify(payload),
+          });
+        } else {
+          const statusCode = refreshResult.statusCode ?? -1;
+          const isAuthRejection = statusCode === 400 || statusCode === 401 || statusCode === 403 || statusCode === 0;
+          
+          if (isAuthRejection) {
+            logger.error('Session explicitly rejected by Axis during app activity sync. Forcing logout.');
+            const { BrowserWindow } = require('electron');
+            const windows = BrowserWindow.getAllWindows();
+            if (windows.length > 0) {
+              windows[0].webContents.send('auth:sign-out');
+            }
+          } else {
+            logger.warn(`App activity refresh failed due to network: ${refreshResult.message}`);
+          }
+        }
       } catch (refreshErr) {
         logger.error('Failed to refresh token during app activity batch', refreshErr);
       }
