@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, session, net, screen, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, session, net, screen, shell, Notification } from 'electron';
 import * as path from 'path';
 import { logger } from './utils/logger';
 import { authStore } from './utils/authStore';
@@ -465,6 +465,40 @@ function registerIpcHandlers(): void {
     await flushHeartbeat();
     await flushAppActivity();
     stopAllBackgroundServices();
+  });
+
+  // OT Warning Notification
+  ipcMain.on(IPC.TIMER_OT_WARNING, (event) => {
+    if (Notification.isSupported()) {
+      const notification = new Notification({
+        title: 'PMS Updated',
+        body: 'Your timer has reached 8 hours. Do you want to continue as overtime?',
+        actions: [
+          { type: 'button', text: 'Continue as OT' },
+          { type: 'button', text: 'Stop Timer' }
+        ],
+        icon: path.join(__dirname, '../../resources/icon.png')
+      });
+
+      notification.on('action', (e, index) => {
+        if (index === 0) {
+          event.sender.send(IPC.TIMER_OT_ACTION, 'continue');
+        } else if (index === 1) {
+          event.sender.send(IPC.TIMER_OT_ACTION, 'stop');
+        }
+      });
+
+      notification.on('close', () => {
+        event.sender.send(IPC.TIMER_OT_ACTION, 'close');
+      });
+
+      notification.show();
+    } else {
+      console.warn('Native notifications not supported on this OS');
+      // If native not supported, fallback by instantly sending 'close' to UI
+      // which should ideally handle it or fallback to web modal if necessary
+      event.sender.send(IPC.TIMER_OT_ACTION, 'close');
+    }
   });
 
   // Break
