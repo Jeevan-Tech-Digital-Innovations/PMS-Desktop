@@ -24,71 +24,85 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor: handle 401/403 and auto-refresh
+// ── Response interceptor: handle 401/403 + queue concurrent requests ──
+let isRefreshing = false;
+let failedQueue: Array<{ resolve: (token: string) => void; reject: (err: unknown) => void }> = [];
+
+const processQueue = (error: unknown, token: string | null): void => {
+  failedQueue.forEach((p) => (error ? p.reject(error) : p.resolve(token!)));
+  failedQueue = [];
+};
+
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // Spring Security may return 403 (default) or 401 (with AuthenticationEntryPoint)
-    // for missing/expired tokens. Handle both to trigger auto-refresh.
     if (
       (error.response?.status === 401 || error.response?.status === 403) &&
       !originalRequest._retry
     ) {
+      // Skip auth endpoints to prevent infinite refresh loops
+      if (originalRequest.url?.match(/\/auth\/(login|logout|refresh-token|authenticate|register)/)) {
+        return Promise.reject(error);
+      }
+
+      // If a refresh is already in flight, queue this request
+      if (isRefreshing) {
+        return new Promise<string>((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        }).then((token) => {
+          originalRequest._retry = true; // Mark queued request too, before re-issuing
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return apiClient(originalRequest);
+        }).catch((err) => Promise.reject(err));
+      }
+
       originalRequest._retry = true;
+      isRefreshing = true;
 
       try {
-        const data = await window.electronAPI!.refreshSession({ axisApiUrl: config.AXIS_API_URL });
+        // Returns a typed result object — never throws for auth rejections
+        const result = await window.electronAPI!.refreshSession({ axisApiUrl: config.AXIS_API_URL });
 
-        // authStore.refreshSession() directly returns the newAccessToken string
-        const newAccessToken = typeof data === 'string' ? data : (data.accessToken || data.data?.accessToken);
+        const newAccessToken = result?.access_token || result?.accessToken || result?.data?.accessToken;
 
-        if (newAccessToken) {
-          const currentUser = useAuthStore.getState().user;
-          const returnedUser = data.user || data.data?.user;
-          
-          let nextUser = currentUser;
-          if (returnedUser) {
-            nextUser = {
-              ...(currentUser || {}),
-              ...returnedUser,
-              userId: returnedUser.id || returnedUser.userId || currentUser?.userId || 1,
-            } as any;
-          }
-
-          const currentRefreshToken = useAuthStore.getState().refreshToken;
-          useAuthStore.getState().setAuth({
-            user: nextUser as any,
-            accessToken: newAccessToken,
-            refreshToken: currentRefreshToken || '', // Preserve existing value; token is managed via Set-Cookie by Axis
-            rememberMe: true, // Preserve remember me state
-          });
-
-          // Retry original request with new token
-          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-          return apiClient(originalRequest);
-        } else {
-          throw new Error('Refresh session did not return an access token');
+        if (!result?.success || !newAccessToken) {
+          throw result; // Pass the typed result to catch block
         }
-      } catch (refreshError: any) {
-        // Refresh failed. 
-        // Only force logout if the server explicitly rejected the token (400, 401, 403) 
-        // or if the refresh cookie is missing. 
-        // Do NOT log out for 404 (Staging bug), 500, or Network Errors!
-        const msg = refreshError.message || String(refreshError);
-        const isAuthRejection = msg.includes('Refresh failed with status: 401') || 
-                                msg.includes('Refresh failed with status: 403') || 
-                                msg.includes('Refresh failed with status: 400') ||
-                                msg.includes('No refresh cookie found');
+
+        // Carry forward existing user and refreshToken — only accessToken changes
+        const currentState = useAuthStore.getState();
+        useAuthStore.getState().setAuth({
+          user: currentState.user!,
+          accessToken: newAccessToken,
+          refreshToken: currentState.refreshToken || '',
+          rememberMe: true,
+        });
+
+        processQueue(null, newAccessToken);
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        return apiClient(originalRequest);
+
+      } catch (refreshResult: any) {
+        processQueue(refreshResult, null);
+
+        // statusCode: 400 | 401 | 403 = explicit Axis rejection → logout
+        // statusCode: 0 = missing cookie → logout
+        // statusCode: -1 = network/proxy error → do NOT logout (transient)
+        const statusCode = refreshResult?.statusCode ?? -1;
+        const isAuthRejection = statusCode === 400 || statusCode === 401 ||
+                                statusCode === 403 || statusCode === 0;
 
         if (isAuthRejection) {
-          console.error('[Auth] Refresh explicitly rejected. Logging out.', msg);
-          useAuthStore.getState().logout();
+          console.error('[Auth] Refresh explicitly rejected by Axis. Logging out.', refreshResult?.message);
+          useAuthStore.getState().logout(true); // skipApiCall = true: token is already dead
         } else {
-          console.warn('[Auth] Refresh failed due to network or lock screen error. Not logging out.', msg);
+          console.warn('[Auth] Transient refresh failure (network/proxy). Not logging out.', refreshResult?.message);
         }
-        return Promise.reject(refreshError);
+        return Promise.reject(error); // Reject with the original API error, not the refresh error
+      } finally {
+        isRefreshing = false;
       }
     }
 
