@@ -285,7 +285,7 @@ export function TimeTracking() {
         <button className={styles.breakBtn} onClick={handleBreakToggle}>
           {isOnBreak ? 'Back to Work' : 'Break'}
         </button>
-        <button className={styles.noteBtn} onClick={openNoteModal}>
+        <button className={styles.noteBtn} onClick={() => openNoteModal()}>
           Add Note
         </button>
         <button

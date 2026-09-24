@@ -170,20 +170,7 @@ async function sendBatch(logId: number, events: AppActivityEvent[]): Promise<voi
     });
 
     if (response.status === 401 || response.status === 403) {
-      try {
-        logger.info('Access token expired, refreshing session...');
-        const newAccessToken = await authStore.refreshSession();
-        response = await fetch(`${API_BASE}/activity/apps/bulk`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${newAccessToken}`,
-          },
-          body: JSON.stringify(payload),
-        });
-      } catch (refreshErr) {
-        logger.error('Failed to refresh token during app activity batch', refreshErr);
-      }
+      logger.warn('Access token expired or unauthorized during app activity batch. Waiting for renderer to refresh.');
     }
 
     if (response.ok) {
