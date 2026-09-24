@@ -1,6 +1,7 @@
 import { logger } from '../utils/logger';
 import { authStore } from '../utils/authStore';
 import { ActiveWindowInfo } from './activeWindow';
+import { getEmployeeSettings } from '../utils/employeeSettings';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
 const FLUSH_INTERVAL_MS = 60_000; // 1 minute
@@ -121,16 +122,9 @@ async function sendBatch(logId: number, events: AppActivityEvent[]): Promise<voi
   try {
     // 1. Fetch current user settings to get trackAppsUrls preference
     let trackAppsUrls = "Track Apps & URLs both";
-    try {
-      const settingsResp = await fetch(`${API_BASE}/employees/me`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      if (settingsResp.ok) {
-        const json = await settingsResp.json();
-        trackAppsUrls = json.data?.trackAppsUrls || trackAppsUrls;
-      }
-    } catch (err) {
-      logger.error('Failed to fetch employee settings for app activity', err);
+    const settingsData = await getEmployeeSettings();
+    if (settingsData && settingsData.trackAppsUrls) {
+      trackAppsUrls = settingsData.trackAppsUrls;
     }
 
     // 2. If OFF, drop the entire payload to save space
@@ -170,7 +164,38 @@ async function sendBatch(logId: number, events: AppActivityEvent[]): Promise<voi
     });
 
     if (response.status === 401 || response.status === 403) {
-      logger.warn('Access token expired or unauthorized during app activity batch. Waiting for renderer to refresh.');
+      try {
+        logger.info('Access token expired, refreshing session for app activity...');
+        const refreshResult = await authStore.refreshSession();
+        
+        if (refreshResult.success) {
+          const newAccessToken = refreshResult.access_token || refreshResult.accessToken || refreshResult.data?.accessToken;
+          response = await fetch(`${API_BASE}/activity/apps/bulk`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${newAccessToken}`,
+            },
+            body: JSON.stringify(payload),
+          });
+        } else {
+          const statusCode = refreshResult.statusCode ?? -1;
+          const isAuthRejection = statusCode === 400 || statusCode === 401 || statusCode === 403 || statusCode === 0;
+          
+          if (isAuthRejection) {
+            logger.error('Session explicitly rejected by Axis during app activity sync. Forcing logout.');
+            const { BrowserWindow } = require('electron');
+            const windows = BrowserWindow.getAllWindows();
+            if (windows.length > 0) {
+              windows[0].webContents.send('auth:sign-out');
+            }
+          } else {
+            logger.warn(`App activity refresh failed due to network: ${refreshResult.message}`);
+          }
+        }
+      } catch (refreshErr) {
+        logger.error('Failed to refresh token during app activity batch', refreshErr);
+      }
     }
 
     if (response.ok) {

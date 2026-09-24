@@ -51,17 +51,35 @@ export async function uploadScreenshot(payload: UploadPayload): Promise<boolean>
     if (response.status === 401 || response.status === 403) {
       try {
         logger.info('Access token expired, refreshing session for screenshot upload...');
-        const newAccessToken = await authStore.refreshSession();
-        response = await fetch(
-          `${API_BASE}/screenshots/upload/${payload.timeLogId}`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${newAccessToken}`,
+        const refreshResult = await authStore.refreshSession();
+        
+        if (refreshResult.success) {
+          const newAccessToken = refreshResult.access_token || refreshResult.accessToken || refreshResult.data?.accessToken;
+          response = await fetch(
+            `${API_BASE}/screenshots/upload/${payload.timeLogId}`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${newAccessToken}`,
+              },
+              body: formData,
             },
-            body: formData,
-          },
-        );
+          );
+        } else {
+          const statusCode = refreshResult.statusCode ?? -1;
+          const isAuthRejection = statusCode === 400 || statusCode === 401 || statusCode === 403 || statusCode === 0;
+          
+          if (isAuthRejection) {
+            logger.error('Session explicitly rejected by Axis during background upload. Forcing logout.');
+            const { BrowserWindow } = require('electron');
+            const windows = BrowserWindow.getAllWindows();
+            if (windows.length > 0) {
+              windows[0].webContents.send('auth:sign-out');
+            }
+          } else {
+            logger.warn(`Screenshot upload refresh failed due to network: ${refreshResult.message}`);
+          }
+        }
       } catch (refreshErr) {
         logger.error('Failed to refresh token during screenshot upload', refreshErr);
       }

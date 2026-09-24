@@ -10,7 +10,15 @@ interface ElectronAPI {
   getStoredUser: () => Promise<{ userId: number; username: string; empNo: string; roles: string[] } | null>;
   saveUser: (user: { userId: number; username: string; empNo: string; roles: string[] }) => Promise<void>;
   loginSSO: (urls: { axisWebUrl: string; axisApiUrl: string }) => Promise<any>;
-  refreshSession: (urls: { axisApiUrl: string }) => Promise<any>;
+  refreshSession: (urls: { axisApiUrl: string }) => Promise<{
+    success: boolean;
+    statusCode: number;
+    message?: string;
+    access_token?: string;
+    accessToken?: string;
+    data?: { accessToken?: string; user?: any };
+    user?: any;
+  }>;
 
   // Timer
   startTimer: (payload: { timeLogId: number; startTime: string }) => void;

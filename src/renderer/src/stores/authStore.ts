@@ -14,7 +14,7 @@ interface AuthState {
 
   // Actions
   setAuth: (data: { user: User; accessToken: string; refreshToken: string; rememberMe: boolean }) => void;
-  logout: () => void;
+  logout: (skipApiCall?: boolean) => void;
   checkStoredTokens: () => Promise<void>;
   setLoading: (loading: boolean) => void;
   updateAuthSession: (accessToken: string, roles: string[], tenantName: string) => void;
@@ -67,7 +67,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
   },
 
-  logout: () => {
+  logout: (skipApiCall = false) => {
     const { refreshToken } = get();
     // Stop timer and reset all stores
     useTimerStore.getState().stopTimer();
@@ -77,8 +77,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     useUiStore.getState().closeNoteModal();
     // Stop Electron background services (screenshots, idle, heartbeat)
     window.electronAPI?.stopTimer();
-    // Fire-and-forget: invalidate refresh token server-side
-    if (refreshToken) {
+    // Fire-and-forget: invalidate refresh token server-side if not skipping
+    if (refreshToken && !skipApiCall) {
       logoutApi(refreshToken);
     }
     window.electronAPI?.clearTokens();
