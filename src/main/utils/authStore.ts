@@ -85,7 +85,7 @@ export const authStore = {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Cookie': `axis_refresh=${refreshCookie.value}`
+            'Cookie': `${refreshCookie.name}=${refreshCookie.value}; axis_refresh=${refreshCookie.value}`
           }
         });
 
