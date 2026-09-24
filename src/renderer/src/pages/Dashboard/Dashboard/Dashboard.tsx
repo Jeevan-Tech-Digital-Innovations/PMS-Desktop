@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTimerStore } from '@/stores/timerStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useStartTimeLog } from '@/hooks/useStartTimeLog';
-import { getPreviousSecondsForTask } from '@/pages/TimeTracking/TimeTrackingApi.services';
+
 import { formatTime } from '@/utils/formatTime';
 import styles from './Dashboard.module.css';
 
@@ -16,19 +16,7 @@ export function Dashboard() {
 
   useEffect(() => {
     if (!isRunning) {
-      if (selectedTask?.id) {
-        let isCurrent = true;
-        getPreviousSecondsForTask(selectedTask.id).then((prevSec) => {
-          if (isCurrent && !useTimerStore.getState().isRunning) {
-            useTimerStore.getState().setWorkSeconds(prevSec);
-          }
-        });
-        return () => {
-          isCurrent = false;
-        };
-      } else {
-        useTimerStore.getState().setWorkSeconds(0);
-      }
+      useTimerStore.getState().setWorkSeconds(0);
     }
   }, [selectedTask?.id, isRunning]);
 

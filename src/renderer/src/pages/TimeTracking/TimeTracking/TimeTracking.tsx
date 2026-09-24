@@ -7,7 +7,7 @@ import { useProjectStore } from '@/stores/projectStore';
 import { useUiStore } from '@/stores/uiStore';
 import { useStartTimeLog } from '@/hooks/useStartTimeLog';
 import { formatTime } from '@/utils/formatTime';
-import { stopTimeLog, getPreviousSecondsForTask } from '../TimeTrackingApi.services';
+import { stopTimeLog } from '../TimeTrackingApi.services';
 import { stopBreak } from '@/services/BreakApi.services';
 import { getNotesForTask, updateNote, deleteNote } from '@/services/NoteApi.services';
 import styles from './TimeTracking.module.css';
@@ -154,12 +154,10 @@ export function TimeTracking() {
   // Resume timer UI if we arrive here with an active time log
   useEffect(() => {
     if (activeTimeLog && !isRunning) {
-      getPreviousSecondsForTask(activeTimeLog.taskId).then((prevSec) => {
-        const diffSec = activeTimeLog.startTime
-          ? Math.max(0, Math.floor((Date.now() - new Date(activeTimeLog.startTime).getTime()) / 1000))
-          : 0;
-        startTimer(prevSec + diffSec);
-      });
+      const diffSec = activeTimeLog.startTime
+        ? Math.max(0, Math.floor((Date.now() - new Date(activeTimeLog.startTime).getTime()) / 1000))
+        : 0;
+      startTimer(diffSec);
     }
   }, [activeTimeLog, isRunning, startTimer]);
 

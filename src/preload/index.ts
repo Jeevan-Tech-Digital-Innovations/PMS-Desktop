@@ -16,6 +16,8 @@ const IPC = {
   TIMER_START: 'timer:start',
   TIMER_STOP: 'timer:stop',
   TIMER_TICK: 'timer:tick',
+  TIMER_OT_WARNING: 'timer:ot-warning',
+  TIMER_OT_ACTION: 'timer:ot-action',
   BREAK_START: 'break:start',
   BREAK_STOP: 'break:stop',
   IDLE_STARTED: 'idle:started',
@@ -52,6 +54,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   startTimer: (payload: { timeLogId: number; startTime: string }) =>
     ipcRenderer.send(IPC.TIMER_START, payload),
   stopTimer: () => ipcRenderer.send(IPC.TIMER_STOP),
+  showOTNotification: () => ipcRenderer.send(IPC.TIMER_OT_WARNING),
+  onOTAction: (callback: (action: 'continue' | 'stop' | 'close') => void) => {
+    const handler = (_: Electron.IpcRendererEvent, action: 'continue' | 'stop' | 'close') => callback(action);
+    ipcRenderer.on(IPC.TIMER_OT_ACTION, handler);
+    return () => ipcRenderer.removeListener(IPC.TIMER_OT_ACTION, handler);
+  },
 
   // ── Break ─────────────────────────────────────────────────────
   startBreak: () => ipcRenderer.send(IPC.BREAK_START),
