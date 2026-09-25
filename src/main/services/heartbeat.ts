@@ -3,7 +3,7 @@ import { authStore } from '../utils/authStore';
 import { IPC } from '../utils/ipcChannels';
 import { getMainWindow } from '../index';
 
-const HEARTBEAT_INTERVAL_MS = Number(process.env.HEARTBEAT_INTERVAL_MS) || 300_000; // 5 min
+const HEARTBEAT_INTERVAL_MS = Number(process.env.HEARTBEAT_INTERVAL_MS) || 30_000; // 30 sec
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
 
 let heartbeatHandle: ReturnType<typeof setInterval> | null = null;
@@ -18,7 +18,8 @@ interface HeartbeatPayload {
 
 /**
  * Starts periodic heartbeat syncing to the backend.
- * Pings every N minutes to persist current time progress.
+ * Fires one immediate ping first, then continues every N minutes.
+ * The immediate ping ensures the web dashboard shows "Working" status instantly.
  */
 export function startHeartbeat(logId: number, start: string): void {
   // Ensure any previous heartbeat is fully cleared before starting a new one
@@ -26,6 +27,9 @@ export function startHeartbeat(logId: number, start: string): void {
 
   timeLogId = logId;
   startTime = start;
+
+  // Fire once immediately so the server knows this user is active right now
+  syncHeartbeat();
 
   heartbeatHandle = setInterval(async () => {
     await syncHeartbeat();

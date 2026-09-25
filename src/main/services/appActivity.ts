@@ -24,8 +24,13 @@ let currentSession: CurrentSession | null = null;
 let eventBuffer: AppActivityEvent[] = [];
 let flushHandle: ReturnType<typeof setInterval> | null = null;
 
+function toLocalIso(date: Date): string {
+  const pad = (n: number) => (n < 10 ? '0' + n : n);
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
 function nowIso(): string {
-  return new Date().toISOString();
+  return toLocalIso(new Date());
 }
 
 function closeCurrentSession(): AppActivityEvent | null {
@@ -40,14 +45,15 @@ function closeCurrentSession(): AppActivityEvent | null {
   const event: AppActivityEvent = {
     appName: currentSession.appName,
     taskTitle: currentSession.taskTitle,
-    startTime: new Date(currentSession.startTime).toISOString(),
-    endTime: new Date(endTime).toISOString(),
+    startTime: toLocalIso(new Date(currentSession.startTime)),
+    endTime: toLocalIso(new Date(endTime)),
     durationSeconds,
   };
 
   currentSession = null;
   return event;
 }
+
 
 function startNewSession(info: ActiveWindowInfo): void {
   currentSession = {

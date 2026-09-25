@@ -125,13 +125,19 @@ export async function getPreviousSecondsForTask(
   }
 }
 
+function getLocalIsoString(d: Date = new Date()): string {
+  const pad = (n: number) => (n < 10 ? '0' + n : n);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 export async function transitionTimerState(taskId: number, newState: string, effectiveTime?: string) {
   const url = API_ENDPOINTS.TIME_LOGS_TRANSITION(taskId);
   const payload = {
     newState,
-    effectiveTime: effectiveTime || new Date().toISOString()
+    effectiveTime: effectiveTime || getLocalIsoString()
   };
   const response = await apiClient.post(url, payload);
   return response.data;
 }
+
 

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, session, net, screen, shell, Notification } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, session, net, screen, shell, Notification, powerMonitor } from 'electron';
 import * as path from 'path';
 import { logger } from './utils/logger';
 import { authStore } from './utils/authStore';
@@ -483,6 +483,9 @@ function registerIpcHandlers(): void {
     resumeActivityMonitor();
     resumeIdleMonitor();
 
+    // Immediately fire a heartbeat so the web portal shows "Working" status without waiting
+    flushHeartbeat().catch(err => logger.error('Failed to flush heartbeat on break stop', err));
+
     if (currentTimeLogId) {
       if (screenshotInterval) {
         clearInterval(screenshotInterval);
@@ -563,6 +566,17 @@ app.whenReady().then(() => {
   });
 
   registerIpcHandlers();
+
+  // Listen for system sleep/resume and screen lock/unlock to immediately refresh heartbeat
+  powerMonitor.on('resume', () => {
+    logger.info('[PowerMonitor] System resumed from sleep, refreshing heartbeat');
+    flushHeartbeat();
+  });
+  powerMonitor.on('unlock-screen', () => {
+    logger.info('[PowerMonitor] Screen unlocked, refreshing heartbeat');
+    flushHeartbeat();
+  });
+
   createWindow();
   createTray(mainWindow!);
 
