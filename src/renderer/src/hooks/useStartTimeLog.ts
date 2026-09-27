@@ -19,9 +19,7 @@ export function useStartTimeLog() {
       // Mark a local start so the sync grace period activates.
       // Must be called BEFORE startTimer to cover the API propagation delay.
       markLocalTimerStart();
-
-      const previousSecondsToday = await getPreviousSecondsForTask(variables.taskId);
-      startTimer(previousSecondsToday);
+      startTimer(0);
 
       window.electronAPI?.startTimer({
         timeLogId: data.id,

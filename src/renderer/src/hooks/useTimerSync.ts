@@ -72,24 +72,21 @@ export function useTimerSync() {
         // Forgotten Timer Protection: 1 hour (3600 seconds) IDLE auto-stop
         if (state.isIdle && state.idleSeconds === 3600) {
           setTimeout(async () => {
-            const shouldContinue = window.confirm('Forgotten Timer Warning: You have been idle for a long time. Click OK to continue the timer, or Cancel to stop it.');
-            if (shouldContinue) {
-              // Reset idle logic or just let the main process know? 
-              // The main process handles idle state, but we can reset our local store.
-              // We just let them click it and they will be active again shortly.
-            } else {
-              const activeLog = useProjectStore.getState().activeTimeLog;
-              try {
-                if (activeLog?.id) {
-                  const { stopTimeLog } = await import('@/pages/TimeTracking/TimeTrackingApi.services');
-                  await stopTimeLog(activeLog.id);
-                }
-                useTimerStore.getState().stopTimer();
-                useProjectStore.getState().setActiveTimeLog(null);
-                window.electronAPI?.stopTimer();
-              } catch (e) {
-                console.error(e);
+            const activeLog = useProjectStore.getState().activeTimeLog;
+            try {
+              if (activeLog?.id) {
+                const { stopTimeLog } = await import('@/pages/TimeTracking/TimeTrackingApi.services');
+                await stopTimeLog(activeLog.id);
               }
+              useTimerStore.getState().stopTimer();
+              useProjectStore.getState().setActiveTimeLog(null);
+              window.electronAPI?.stopTimer();
+              
+              new Notification('PMS Tracker', {
+                body: 'Your timer was auto-stopped due to 60 minutes of inactivity.'
+              });
+            } catch (e) {
+              console.error(e);
             }
           }, 0);
         }

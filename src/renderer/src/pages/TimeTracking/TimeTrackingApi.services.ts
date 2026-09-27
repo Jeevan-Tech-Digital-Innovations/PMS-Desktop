@@ -44,19 +44,23 @@ function buildActivityLogPayload(): Array<Record<string, string>> {
 }
 
 export async function startTimeLog(taskId: number) {
-  const activityPayload = buildActivityLogPayload();
-  const { data } = await apiClient.post(
-    API_ENDPOINTS.TIME_LOGS_START(taskId),
-    activityPayload,
-  );
-  return data?.data ? data.data : data;
+  return enqueueOperation(async () => {
+    const activityPayload = buildActivityLogPayload();
+    const { data } = await apiClient.post(
+      API_ENDPOINTS.TIME_LOGS_START(taskId),
+      activityPayload,
+    );
+    return data?.data ? data.data : data;
+  });
 }
 
 export async function stopTimeLog(taskId: number) {
-  const { data } = await apiClient.put(
-    API_ENDPOINTS.TIME_LOGS_STOP(taskId),
-  );
-  return data?.data ? data.data : data;
+  return enqueueOperation(async () => {
+    const { data } = await apiClient.put(
+      API_ENDPOINTS.TIME_LOGS_STOP(taskId),
+    );
+    return data?.data ? data.data : data;
+  });
 }
 
 export async function getActiveTimeLog() {
@@ -149,14 +153,31 @@ function getLocalIsoString(d: Date = new Date()): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
+let timerOperationQueue: Promise<any> = Promise.resolve();
+
+function enqueueOperation<T>(operation: () => Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    timerOperationQueue = timerOperationQueue.then(async () => {
+      try {
+        const result = await operation();
+        resolve(result);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
+}
+
 export async function transitionTimerState(taskId: number, newState: string, effectiveTime?: string) {
-  const url = API_ENDPOINTS.TIME_LOGS_TRANSITION(taskId);
-  const payload = {
-    newState,
-    effectiveTime: effectiveTime || getLocalIsoString()
-  };
-  const response = await apiClient.post(url, payload);
-  return response.data;
+  return enqueueOperation(async () => {
+    const url = API_ENDPOINTS.TIME_LOGS_TRANSITION(taskId);
+    const payload = {
+      newState,
+      effectiveTime: effectiveTime || getLocalIsoString()
+    };
+    const response = await apiClient.post(url, payload);
+    return response.data;
+  });
 }
 
 
