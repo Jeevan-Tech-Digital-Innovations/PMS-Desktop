@@ -88,35 +88,54 @@ export async function getPreviousSecondsForTask(
 
     if (!Array.isArray(logs) || logs.length === 0) return 0;
 
-    let previousSecondsToday = 0;
+    const intervals: Array<{ start: number; end: number }> = [];
+    const today = new Date();
+    const startOfTodayMs = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+
+    const parseLogTime = (timeStr: string) => {
+      let str = timeStr;
+      if (str.includes(' ') && !str.includes('T')) str = str.replace(' ', 'T');
+      return new Date(str).getTime();
+    };
+
     for (const log of logs) {
-      // Only count completed logs (endTime present) for this task
+      // Only count completed work logs (endTime present) for this task today
       if (
         String(log.taskId) === String(taskId) &&
         log.endTime &&
-        log.startTime
+        log.startTime &&
+        log.timeType !== 'IDLE' &&
+        log.timeType !== 'AWAY' &&
+        log.timeType !== 'BREAK'
       ) {
-        const parseLogTime = (timeStr: string) => {
-          let str = timeStr;
-          if (str.includes(' ') && !str.includes('T')) str = str.replace(' ', 'T');
-          if (!str.endsWith('Z') && !str.match(/[+-]\d{2}:?\d{2}$/)) str += 'Z';
-          return new Date(str).getTime();
-        };
-
         const logStart = parseLogTime(log.startTime);
-        
-        if (log.durationMinutes != null && log.durationMinutes > 0) {
-          // Use server-computed duration (most accurate)
-          previousSecondsToday += log.durationMinutes * 60;
-        } else {
-          // Fallback: compute from timestamps
-          const logEnd = parseLogTime(log.endTime);
-          if (logEnd > logStart) {
-            previousSecondsToday += Math.floor((logEnd - logStart) / 1000);
-          }
+        const logEnd = parseLogTime(log.endTime);
+        if (logEnd > logStart && logEnd >= startOfTodayMs) {
+          intervals.push({
+            start: Math.max(logStart, startOfTodayMs),
+            end: logEnd,
+          });
         }
       }
     }
+
+    if (intervals.length === 0) return 0;
+
+    // Merge overlapping intervals to prevent double counting
+    intervals.sort((a, b) => a.start - b.start);
+    const merged: Array<{ start: number; end: number }> = [intervals[0]];
+    for (let i = 1; i < intervals.length; i++) {
+      const last = merged[merged.length - 1];
+      if (intervals[i].start <= last.end) {
+        last.end = Math.max(last.end, intervals[i].end);
+      } else {
+        merged.push(intervals[i]);
+      }
+    }
+
+    const previousSecondsToday = Math.floor(
+      merged.reduce((acc, curr) => acc + (curr.end - curr.start) / 1000, 0)
+    );
 
     return previousSecondsToday;
   } catch (err) {

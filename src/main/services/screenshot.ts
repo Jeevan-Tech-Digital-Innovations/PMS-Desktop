@@ -12,7 +12,8 @@ const TEMP_DIR = path.join(app.getPath('temp'), 'workstatus-screenshots');
  */
 export async function captureScreenshot(): Promise<Buffer | null> {
   try {
-    const imgBuffer = await screenshot({ format: 'png' });
+    const result = await screenshot({ format: 'png' });
+    const imgBuffer = Array.isArray(result) ? result[0] : result;
     logger.info(`Screenshot captured directly to memory`);
     return imgBuffer;
   } catch (error) {

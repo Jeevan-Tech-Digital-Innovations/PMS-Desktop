@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useProjectStore } from '@/stores/projectStore';
 import { useAuthStore } from '@/stores/authStore';
-import { fetchAssignedItems, AssignedItem } from '../TasksApi.services';
+import { fetchAssignedItems, AssignedItem, completeTask } from '../TasksApi.services';
 import styles from './Tasks.module.css';
 
 // ─── Refresh button ───────────────────────────────────────────────────────────
@@ -27,15 +27,29 @@ interface ItemCardProps {
   item: AssignedItem;
   isSelected: boolean;
   onSelect: (item: AssignedItem) => void;
+  onComplete?: (item: AssignedItem) => void;
 }
 
-const ItemCard = ({ item, isSelected, onSelect }: ItemCardProps) => (
+const ItemCard = ({ item, isSelected, onSelect, onComplete }: ItemCardProps) => (
   <button
     className={`${styles.card} ${isSelected ? styles.selected : ''} ${item.itemType === 'subtask' ? styles.subtaskCard : ''}`}
     onClick={() => onSelect(item)}
     title="Select & Start"
   >
     <div className={styles.cardTop}>
+      {onComplete && (
+        <button
+          className={styles.completeCircle}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onComplete(item);
+          }}
+          title="Mark as complete"
+        >
+          <div className={styles.circleInner}></div>
+        </button>
+      )}
       <span className={styles.name}>{item.title}</span>
       {item.itemType === 'subtask' && (
         <span
@@ -87,6 +101,8 @@ export function Tasks() {
 
   const [search, setSearch] = useState('');
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const [taskToComplete, setTaskToComplete] = useState<AssignedItem | null>(null);
+  const [isCompleting, setIsCompleting] = useState(false);
   const activeProject = draftProject || selectedProject;
   const queryClient = useQueryClient();
 
@@ -106,6 +122,20 @@ export function Tasks() {
       await refetch();
     } finally {
       setIsManualRefreshing(false);
+    }
+  };
+
+  const handleConfirmComplete = async () => {
+    if (!taskToComplete) return;
+    setIsCompleting(true);
+    try {
+      await completeTask(taskToComplete);
+      await handleRefresh();
+      setTaskToComplete(null);
+    } catch (e) {
+      console.error('Failed to complete task', e);
+    } finally {
+      setIsCompleting(false);
     }
   };
 
@@ -171,10 +201,39 @@ export function Tasks() {
               item={item}
               isSelected={selectedTask?.id === item.id}
               onSelect={handleSelect}
+              onComplete={setTaskToComplete}
             />
           ))
         )}
       </div>
+
+      {/* Complete Task Modal */}
+      {taskToComplete && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <h3 className={styles.modalTitle}>Complete Task</h3>
+            <p className={styles.modalText}>
+              Do you want to mark "{taskToComplete.title}" as complete?
+            </p>
+            <div className={styles.modalActions}>
+              <button
+                className={styles.modalCancelBtn}
+                onClick={() => setTaskToComplete(null)}
+                disabled={isCompleting}
+              >
+                Cancel
+              </button>
+              <button
+                className={styles.modalCompleteBtn}
+                onClick={handleConfirmComplete}
+                disabled={isCompleting}
+              >
+                {isCompleting ? 'Completing...' : 'Complete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

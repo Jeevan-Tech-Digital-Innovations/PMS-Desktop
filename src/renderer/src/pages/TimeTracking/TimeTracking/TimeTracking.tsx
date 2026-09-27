@@ -7,7 +7,7 @@ import { useProjectStore } from '@/stores/projectStore';
 import { useUiStore } from '@/stores/uiStore';
 import { useStartTimeLog } from '@/hooks/useStartTimeLog';
 import { formatTime } from '@/utils/formatTime';
-import { stopTimeLog } from '../TimeTrackingApi.services';
+import { stopTimeLog, getActiveTimeLog } from '../TimeTrackingApi.services';
 import { stopBreak } from '@/services/BreakApi.services';
 import { getNotesForTask, updateNote, deleteNote } from '@/services/NoteApi.services';
 import styles from './TimeTracking.module.css';
@@ -162,7 +162,11 @@ export function TimeTracking() {
   }, [activeTimeLog, isRunning, startTimer]);
 
   const stopMutation = useMutation({
-    mutationFn: () => stopTimeLog(activeTimeLog!.taskId),
+    mutationFn: (overrideTaskId?: number) => {
+      const taskId = overrideTaskId || activeTimeLog?.taskId || selectedTask?.id;
+      if (!taskId) throw new Error('No task ID found to stop');
+      return stopTimeLog(Number(taskId));
+    },
     onSuccess: () => {
       stopTimer();
       setActiveTimeLog(null);
@@ -172,6 +176,10 @@ export function TimeTracking() {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to stop timer');
+      stopTimer();
+      setActiveTimeLog(null);
+      window.electronAPI?.stopTimer();
+      navigate('/dashboard');
     },
   });
 
@@ -180,14 +188,22 @@ export function TimeTracking() {
     startMutation.mutate({ taskId: selectedTask.id });
   };
 
-  const handleStop = () => {
-    if (!activeTimeLog) {
-      stopTimer();
-      window.electronAPI?.stopTimer();
-      navigate('/dashboard');
+  const handleStop = async () => {
+    const taskId = activeTimeLog?.taskId || selectedTask?.id;
+    if (taskId) {
+      stopMutation.mutate(Number(taskId));
       return;
     }
-    stopMutation.mutate();
+    try {
+      const active = await getActiveTimeLog();
+      if (active?.taskId) {
+        stopMutation.mutate(Number(active.taskId));
+        return;
+      }
+    } catch (e) {}
+    stopTimer();
+    window.electronAPI?.stopTimer();
+    navigate('/dashboard');
   };
 
   const handleBreakToggle = async () => {

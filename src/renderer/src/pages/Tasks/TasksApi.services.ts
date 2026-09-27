@@ -229,7 +229,8 @@ export async function fetchAssignedItems(
   const result: AssignedItem[] = [];
 
   for (const task of Array.from(taskMap.values())) {
-    if (isTaskAssigned(task, userIds)) {
+    const isCompleted = task.status && String(task.status).toUpperCase() === 'COMPLETED';
+    if (!isCompleted && isTaskAssigned(task, userIds)) {
       const level = calculateTaskLevel(task, taskMap);
       const parentTaskTitle = getParentTitle(task, taskMap);
       const itemType: ItemType = level === 1 ? 'task' : 'subtask';
@@ -254,6 +255,26 @@ export async function fetchAssignedItems(
 
   return result;
 }
+
+export async function completeTask(task: Task): Promise<void> {
+  const payload = {
+    title: task.title,
+    description: task.description,
+    assigneeId: task.assigneeId,
+    members: task.members,
+    projectId: task.projectId,
+    parentTaskId: task.parentTaskId,
+    mainTaskId: task.mainTaskId,
+    status: 'COMPLETED',
+    priority: task.priority,
+    dueDate: task.dueDate,
+    billable: task.billable,
+    list: task.list,
+    estimatedTime: task.estimatedTime
+  };
+  await apiClient.put(`/tasks/${task.id}`, payload);
+}
+
 
 /** Legacy exports kept for compatibility */
 export async function fetchTasks(projectId: number, search?: string, userId?: string | number): Promise<Task[]> {

@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { useEffect } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { useTimerStore } from '@/stores/timerStore';
+import { useProjectStore } from '@/stores/projectStore';
 import { useUiStore } from '@/stores/uiStore';
 import { useTimerSync } from '@/hooks/useTimerSync';
 import { fetchMyProfile } from '@/services/ProfileApi.services';
@@ -127,10 +128,36 @@ export default function App() {
       } catch (err) {
         console.error("Failed to fetch profile for idle notes check", err);
       }
+
+      // Sync IDLE state to API
+      if (useTimerStore.getState().isRunning) {
+        const taskId = useProjectStore.getState().activeTimeLog?.taskId || (useProjectStore.getState().selectedTask as any)?.id;
+        if (taskId) {
+          try {
+            const { transitionTimerState } = await import('@/pages/TimeTracking/TimeTrackingApi.services');
+            await transitionTimerState(Number(taskId), 'IDLE');
+          } catch (e) {
+            console.error('[Idle] Failed to transition to IDLE', e);
+          }
+        }
+      }
     });
-    const unsubscribeStop = window.electronAPI.onIdleStopped(() => {
+    const unsubscribeStop = window.electronAPI.onIdleStopped(async () => {
       console.log('[Idle] Stopped');
       useTimerStore.getState().stopIdle();
+
+      // Sync active state back to API
+      if (useTimerStore.getState().isRunning) {
+        const taskId = useProjectStore.getState().activeTimeLog?.taskId || (useProjectStore.getState().selectedTask as any)?.id;
+        if (taskId) {
+          try {
+            const { transitionTimerState } = await import('@/pages/TimeTracking/TimeTrackingApi.services');
+            await transitionTimerState(Number(taskId), 'ACTIVE_PRODUCTIVE');
+          } catch (e) {
+            console.error('[Idle] Failed to transition to ACTIVE_PRODUCTIVE', e);
+          }
+        }
+      }
     });
     return () => {
       unsubscribeStart?.();

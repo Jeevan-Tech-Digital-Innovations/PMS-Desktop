@@ -15,10 +15,12 @@ export function Dashboard() {
   const startMutation = useStartTimeLog();
 
   useEffect(() => {
+    // Only reset when task changes (not when timer simply stops)
     if (!isRunning) {
       useTimerStore.getState().setWorkSeconds(0);
     }
-  }, [selectedTask?.id, isRunning]);
+  }, [selectedTask?.id]); // <-- removed isRunning from deps
+
 
   const getStatusText = () => {
     if (!isRunning) return 'Ready';

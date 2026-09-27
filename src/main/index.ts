@@ -219,7 +219,7 @@ async function captureAndUploadScreenshot(timeLogId: number): Promise<void> {
     capturedAt,
     keyboardActivity,
     mouseActivity,
-    activeWindowTitle: currentActiveWindowTitle,
+    activeWindowTitle: currentActiveWindowTitle || 'Unknown',
   });
 
   if (uploadSuccess) {

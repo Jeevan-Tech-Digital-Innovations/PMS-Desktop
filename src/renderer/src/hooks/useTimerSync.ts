@@ -99,6 +99,33 @@ export function useTimerSync() {
     return () => clearInterval(tickInterval);
   }, [isAuthenticated, tick, tickBreak]);
 
-  // Removed Periodic active timer sync with API to stop auto-syncing between web and desktop
+  // Restore active timer on mount if backend has a running log and local state is empty
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const restoreActiveLog = async () => {
+      try {
+        const activeLog = await getActiveTimeLog();
+        if (activeLog && activeLog.taskId) {
+          useProjectStore.getState().setActiveTimeLog(activeLog);
+          if (!useProjectStore.getState().selectedTask) {
+            useProjectStore.getState().setSelectedTask({
+              id: activeLog.taskId,
+              title: activeLog.taskName || 'Active Task',
+              projectId: activeLog.projectId,
+            } as any);
+          }
+          if (activeLog.projectId && !useProjectStore.getState().selectedProject) {
+            useProjectStore.getState().setSelectedProject({
+              id: activeLog.projectId,
+              name: activeLog.projectName || 'Active Project',
+            } as any);
+          }
+        }
+      } catch (err) {
+        console.error('[TimerSync] Failed to restore active time log:', err);
+      }
+    };
+    restoreActiveLog();
+  }, [isAuthenticated]);
 }
 
