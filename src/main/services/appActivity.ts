@@ -1,6 +1,7 @@
 import { logger } from '../utils/logger';
 import { authStore } from '../utils/authStore';
 import { ActiveWindowInfo } from './activeWindow';
+import { getEmployeeSettings } from '../utils/employeeSettings';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
 const FLUSH_INTERVAL_MS = 60_000; // 1 minute
@@ -127,16 +128,9 @@ async function sendBatch(logId: number, events: AppActivityEvent[]): Promise<voi
   try {
     // 1. Fetch current user settings to get trackAppsUrls preference
     let trackAppsUrls = "Track Apps & URLs both";
-    try {
-      const settingsResp = await fetch(`${API_BASE}/employees/me`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      if (settingsResp.ok) {
-        const json = await settingsResp.json();
-        trackAppsUrls = json.data?.trackAppsUrls || trackAppsUrls;
-      }
-    } catch (err) {
-      logger.error('Failed to fetch employee settings for app activity', err);
+    const settingsData = await getEmployeeSettings();
+    if (settingsData && settingsData.trackAppsUrls) {
+      trackAppsUrls = settingsData.trackAppsUrls;
     }
 
     // 2. If OFF, drop the entire payload to save space
