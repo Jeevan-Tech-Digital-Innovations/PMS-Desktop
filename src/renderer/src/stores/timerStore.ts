@@ -99,6 +99,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     set((state) => ({
       isIdle: true,
       idleSeconds: state.idleSeconds + offsetSeconds,
+      workSeconds: Math.max(0, state.workSeconds - offsetSeconds),
       lastTickTime: Date.now(),
     })),
 
