@@ -229,8 +229,7 @@ export async function fetchAssignedItems(
   const result: AssignedItem[] = [];
 
   for (const task of Array.from(taskMap.values())) {
-    const isCompleted = task.status && String(task.status).toUpperCase() === 'COMPLETED';
-    if (!isCompleted && isTaskAssigned(task, userIds)) {
+    if (isTaskAssigned(task, userIds)) {
       const level = calculateTaskLevel(task, taskMap);
       const parentTaskTitle = getParentTitle(task, taskMap);
       const itemType: ItemType = level === 1 ? 'task' : 'subtask';
@@ -256,24 +255,27 @@ export async function fetchAssignedItems(
   return result;
 }
 
-export async function completeTask(task: Task): Promise<void> {
-  const payload = {
-    title: task.title,
-    description: task.description,
-    assigneeId: task.assigneeId,
-    members: task.members,
-    projectId: task.projectId,
-    parentTaskId: task.parentTaskId,
-    mainTaskId: task.mainTaskId,
-    status: 'COMPLETED',
-    priority: task.priority,
-    dueDate: task.dueDate,
-    billable: task.billable,
-    list: task.list,
-    estimatedTime: task.estimatedTime
-  };
-  await apiClient.put(`/tasks/${task.id}`, payload);
+export async function createTask(payload: {
+  title: string;
+  projectId: number;
+  parentTaskId?: number | null;
+  description?: string;
+  dueDate?: string;
+  estimatedTime?: string;
+  assigneeId?: string | number | null;
+}): Promise<any> {
+  const { data } = await apiClient.post('/tasks', {
+    ...payload,
+    status: 'OPEN',
+    priority: 'MEDIUM',
+    billable: true,
+    list: 'General',
+    estimatedTime: payload.estimatedTime || '00:00:00',
+  });
+  return data?.data ? data.data : data;
 }
+
+
 
 
 /** Legacy exports kept for compatibility */
@@ -308,4 +310,16 @@ export async function fetchSubTasks(taskId: number, search?: string, userId?: st
     });
   }
   return subList;
+}
+
+export async function updateTaskStatus(taskId: number, status: string, title?: string): Promise<any> {
+  const { data } = await apiClient.put(`/tasks/${taskId}`, {
+    status,
+    ...(title ? { title } : {}),
+  });
+  return data?.data ? data.data : data;
+}
+
+export async function completeTask(task: Task | AssignedItem): Promise<any> {
+  return updateTaskStatus(task.id, 'Completed', task.title);
 }

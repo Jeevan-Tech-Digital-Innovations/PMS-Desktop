@@ -57,16 +57,17 @@ function createWindow(): void {
 
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth } = primaryDisplay.workAreaSize;
-  const windowWidth = 400;
-  const windowHeight = 700;
+  const windowWidth = 360;
+  const windowHeight = 490;
 
   mainWindow = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
+    useContentSize: true,
     x: screenWidth - windowWidth - 20,
     y: 20,
     minWidth: 350,
-    minHeight: 600,
+    minHeight: 480,
     resizable: false,
     title: 'ENJEV | PMS Desktop',
     icon: path.join(__dirname, '../../resources/icon.png'),

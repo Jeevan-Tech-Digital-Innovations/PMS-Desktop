@@ -4,7 +4,9 @@ interface TimerState {
   isRunning: boolean;
   isOnBreak: boolean;
   isIdle: boolean;
-  workSeconds: number;
+  workSeconds: number; // session duration
+  taskSeconds: number; // individual task duration today
+  dailyTotalSeconds: number; // overall working time throughout the day
   idleSeconds: number;
   breakSeconds: number;
   activeBreakLimit: number | null;
@@ -16,6 +18,9 @@ interface TimerState {
   // Actions
   startTimer: (initialSeconds?: number) => void;
   setWorkSeconds: (seconds: number) => void;
+  setTaskSeconds: (seconds: number) => void;
+  setDailyTotalSeconds: (seconds: number) => void;
+  initDailyTime: (dailySeconds: number, taskSeconds?: number) => void;
   stopTimer: () => void;
   tick: () => void;
   startIdle: (offsetSeconds: number) => void;
@@ -32,6 +37,8 @@ export const useTimerStore = create<TimerState>((set, get) => ({
   isOnBreak: false,
   isIdle: false,
   workSeconds: 0,
+  taskSeconds: 0,
+  dailyTotalSeconds: 0,
   idleSeconds: 0,
   breakSeconds: 0,
   activeBreakLimit: null,
@@ -41,7 +48,7 @@ export const useTimerStore = create<TimerState>((set, get) => ({
   lastTickTime: 0,
 
   startTimer: (initialSeconds = 0) =>
-    set({
+    set((state) => ({
       isRunning: true,
       isOnBreak: false,
       isIdle: false,
@@ -53,12 +60,28 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       startTime: new Date().toISOString(),
       isOvertime: false,
       lastTickTime: Date.now(),
-    }),
+    })),
 
   setWorkSeconds: (seconds) =>
     set({
-      workSeconds: seconds,
+      workSeconds: Math.max(0, seconds),
     }),
+
+  setTaskSeconds: (seconds) =>
+    set({
+      taskSeconds: Math.max(0, seconds),
+    }),
+
+  setDailyTotalSeconds: (seconds) =>
+    set({
+      dailyTotalSeconds: Math.max(0, seconds),
+    }),
+
+  initDailyTime: (dailySeconds, taskSeconds) =>
+    set((state) => ({
+      dailyTotalSeconds: Math.max(state.dailyTotalSeconds, dailySeconds),
+      taskSeconds: taskSeconds !== undefined ? Math.max(0, taskSeconds) : state.taskSeconds,
+    })),
 
   stopTimer: () =>
     set({
@@ -89,6 +112,8 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       } else {
         set((state) => ({ 
           workSeconds: state.workSeconds + elapsedSeconds,
+          taskSeconds: state.taskSeconds + elapsedSeconds,
+          dailyTotalSeconds: state.dailyTotalSeconds + elapsedSeconds,
           lastTickTime: state.lastTickTime + (elapsedSeconds * 1000)
         }));
       }
@@ -100,6 +125,8 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       isIdle: true,
       idleSeconds: state.idleSeconds + offsetSeconds,
       workSeconds: Math.max(0, state.workSeconds - offsetSeconds),
+      taskSeconds: Math.max(0, state.taskSeconds - offsetSeconds),
+      dailyTotalSeconds: Math.max(0, state.dailyTotalSeconds - offsetSeconds),
       lastTickTime: Date.now(),
     })),
 
@@ -152,6 +179,8 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       isOnBreak: false,
       isIdle: false,
       workSeconds: 0,
+      taskSeconds: 0,
+      dailyTotalSeconds: 0,
       idleSeconds: 0,
       breakSeconds: 0,
       activeBreakLimit: null,
@@ -161,3 +190,4 @@ export const useTimerStore = create<TimerState>((set, get) => ({
       lastTickTime: 0,
     }),
 }));
+

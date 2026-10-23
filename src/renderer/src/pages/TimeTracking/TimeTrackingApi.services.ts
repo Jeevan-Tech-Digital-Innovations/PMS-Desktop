@@ -69,6 +69,39 @@ export async function getActiveTimeLog() {
   return (data?.data ? data.data : data) || null;
 }
 
+export async function getAccumulatedSecondsToday(): Promise<number> {
+  try {
+    const userId = useAuthStore.getState().user?.userId;
+    const url = userId
+      ? `${API_ENDPOINTS.TIME_LOGS_ACCUMULATED_TODAY}?userId=${userId}`
+      : API_ENDPOINTS.TIME_LOGS_ACCUMULATED_TODAY;
+    const { data } = await apiClient.get(url);
+    const val = typeof data === 'number' ? data : (data?.data ?? 0);
+    return typeof val === 'number' && !isNaN(val) ? Math.max(0, val) : 0;
+  } catch (err) {
+    console.error('Failed to get accumulated seconds today:', err);
+    return 0;
+  }
+}
+
+export async function getTaskAccumulatedSecondsToday(taskId: number | string): Promise<number> {
+  if (!taskId) return 0;
+  try {
+    const userId = useAuthStore.getState().user?.userId;
+    const url = userId
+      ? `${API_ENDPOINTS.TASK_ACCUMULATED_TODAY(Number(taskId))}?userId=${userId}`
+      : API_ENDPOINTS.TASK_ACCUMULATED_TODAY(Number(taskId));
+    const { data } = await apiClient.get(url);
+    const val = typeof data === 'number' ? data : (data?.data ?? 0);
+    if (typeof val === 'number' && !isNaN(val) && val >= 0) {
+      return val;
+    }
+  } catch {
+    // Fallback to client-side logs calculation
+  }
+  return getPreviousSecondsForTask(taskId);
+}
+
 /**
  * Calculates accumulated time logged today for a given task (in seconds).
  * Uses durationMinutes from each completed log as the primary source

@@ -1,120 +1,144 @@
 .container {
-  padding: 24px;
-  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  max-width: 360px;
   margin: 0 auto;
-  font-family: 'Inter', 'Segoe UI', sans-serif;
-  color: #333;
 }
 
 .header {
   display: flex;
   align-items: center;
-  font-size: 20px;
-  font-weight: 600;
-  margin-bottom: 32px;
-  gap: 16px;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
 .backBtn {
-  background: none;
-  border: none;
-  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px;
-  border-radius: 50%;
-  color: #1677ff;
-  transition: background-color 0.2s;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
-.backBtn:hover {
-  background-color: #f0f0f0;
+.backBtn:hover:not(:disabled) {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+  color: #0F172A;
+}
+
+.backBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0;
 }
 
 .content {
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: #fff;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
   border-radius: 12px;
-  padding: 40px 24px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  padding: 20px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .avatarContainer {
   position: relative;
-  margin-bottom: 24px;
+  margin-bottom: 12px;
 }
 
 .avatar {
-  width: 96px;
-  height: 96px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
-  background-color: #1677ff;
-  color: #ffffff;
+  background: #0E8784;
+  color: #FFFFFF;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 36px;
+  font-size: 22px;
   font-weight: 700;
-  border: 2px solid #eaeaea;
+  border: 3px solid #E6F4F1;
 }
 
 .name {
-  font-size: 24px;
-  font-weight: 600;
-  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0 0 2px 0;
+  text-align: center;
 }
 
 .role {
-  font-size: 14px;
-  color: #888;
-  margin: 0 0 32px 0;
+  font-size: 12px;
+  color: #64748B;
+  margin: 0 0 20px 0;
   text-transform: capitalize;
+  font-weight: 500;
 }
 
 .detailsList {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
 
 .detailItem {
   display: flex;
   align-items: center;
-  padding: 16px;
-  background-color: #f9fafb;
+  padding: 10px 12px;
+  background-color: #F8FAFC;
+  border: 1px solid #E2E8F0;
   border-radius: 8px;
-  gap: 16px;
+  gap: 12px;
 }
 
 .detailIcon {
-  color: #6b7280;
+  color: #0E8784;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .detailText {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   flex: 1;
+  overflow: hidden;
 }
 
 .detailLabel {
-  font-size: 12px;
-  color: #6b7280;
+  font-size: 10px;
+  color: #64748B;
   text-transform: uppercase;
+  font-weight: 700;
   letter-spacing: 0.5px;
 }
 
 .detailValue {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 500;
-  color: #111827;
+  color: #0F172A;
+  word-break: break-all;
 }
 
 .tenantSelectWrapper {
@@ -124,35 +148,36 @@
 
 .tenantSelect {
   width: 100%;
-  padding: 10px 36px 10px 12px;
+  padding: 6px 28px 6px 8px;
   border-radius: 6px;
-  border: 1px solid #d9d9d9;
-  font-size: 15px;
-  color: #111827;
-  background-color: #fff;
+  border: 1px solid #E2E8F0;
+  font-size: 13px;
+  color: #0F172A;
+  background-color: #FFFFFF;
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   font-family: inherit;
 }
 
 .tenantSelect:hover {
-  border-color: #4096ff;
+  border-color: #0E8784;
 }
 
 .tenantSelect:focus {
   outline: none;
-  border-color: #1677ff;
-  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
+  border-color: #0E8784;
+  box-shadow: 0 0 0 2px rgba(14, 135, 132, 0.12);
 }
 
 .selectIcon {
   position: absolute;
-  right: 12px;
+  right: 8px;
   top: 50%;
   transform: translateY(-50%);
   pointer-events: none;
-  color: #8c8c8c;
+  color: #64748B;
 }
+

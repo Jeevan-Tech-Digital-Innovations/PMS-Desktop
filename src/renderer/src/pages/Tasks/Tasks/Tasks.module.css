@@ -1,310 +1,542 @@
 .container {
-  max-width: 500px;
-  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  height: 100%;
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto;
 }
 
-/* ─── Header ─────────────────────────────────────────────────── */
 .header {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 .backBtn {
-  background: none;
-  border: none;
-  color: #1677ff;
-  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  color: #1E293B;
   cursor: pointer;
-  padding: 0;
-  white-space: nowrap;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.backBtn:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
 }
 
 .title {
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0F172A;
   flex: 1;
+  line-height: 1.2;
+}
+
+/* Project Selector Box matching Frame 6 & 7 */
+.projectSelectorBox {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-bottom: 12px;
+  transition: all 0.15s ease;
+}
+
+.projectSelectorBox:hover {
+  border-color: #0E8784;
+  background: #FBFDFD;
+}
+
+.projectBoxLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.folderIcon {
+  display: flex;
+  align-items: center;
+  color: #64748B;
+}
+
+.projectBoxName {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0F172A;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.refreshBtn {
-  margin-left: auto;
-  background: white;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  padding: 0.3rem 0.6rem;
+.chevronIcon {
+  display: flex;
+  align-items: center;
+  color: #64748B;
+  margin-left: 8px;
+}
+
+/* Search Wrapper */
+.searchWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  color: #94A3B8;
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px 0 36px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #0F172A;
+  transition: all 0.15s ease;
+}
+
+.searchInput::placeholder {
+  color: #94A3B8;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: #0E8784;
+  box-shadow: 0 0 0 3px rgba(14, 135, 132, 0.1);
+}
+
+/* Tasks List */
+.list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.list::-webkit-scrollbar-thumb {
+  background: #E2E8F0;
+  border-radius: 4px;
+}
+
+/* Card */
+.card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #FFFFFF;
+  border: 1px solid transparent;
+  border-radius: 10px;
   cursor: pointer;
-  font-size: 16px;
-  color: #4b5563;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.card:hover {
+  background: #F8FAFC;
+}
+
+.cardLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.playBadge {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #F1F5F9;
+  color: #64748B;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.textContainer {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.taskTitle {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0F172A;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 170px;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1.5px 6px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.statusCompleted {
+  background: #ECFDF5;
+  color: #059669;
+  border: 1px solid #A7F3D0;
+}
+
+.statusReview {
+  background: #FFFBEB;
+  color: #D97706;
+  border: 1px solid #FDE68A;
+}
+
+.statusInProgress {
+  background: #EFF6FF;
+  color: #2563EB;
+  border: 1px solid #BFDBFE;
+}
+
+.statusOnHold {
+  background: #FEF2F2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+}
+
+.statusOpen {
+  background: #F3F4F6;
+  color: #4B5563;
+  border: 1px solid #E5E7EB;
+}
+
+.taskSubtitle {
+  font-size: 11.5px;
+  color: #94A3B8;
+  line-height: 1.3;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardRight {
+  display: flex;
+  align-items: center;
+  margin-left: 10px;
   flex-shrink: 0;
 }
 
-.refreshBtn:hover:not(:disabled) {
-  background: #f3f4f6;
-  color: #111827;
+/* Radio circle selection indicator */
+.radioCircle {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid #CBD5E1;
+  background: #FFFFFF;
+  transition: all 0.15s ease;
 }
 
-.refreshBtn:disabled {
+/* Selected task card matching Figma Frame 6 */
+.cardSelected {
+  background: #E6F4F1 !important;
+}
+
+.cardSelected .taskTitle {
+  color: #0D9488;
+}
+
+.cardSelected .playBadge {
+  background: #FFFFFF;
+  color: #0D9488;
+}
+
+.radioSelected {
+  border: 5px solid #0E8784;
+  background: #FFFFFF;
+}
+
+/* Loading & Empty */
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 50px 0;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #E6F4F1;
+  border-top-color: #0E8784;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.loadingText {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #64748B;
+}
+
+.emptyContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+.emptyText {
+  font-size: 13px;
+  color: #94A3B8;
+}
+
+/* Fixed Bottom Bar */
+.bottomBar {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.selectTaskBtn {
+  width: 100%;
+  padding: 13px 20px;
+  background: #0E8784;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(14, 135, 132, 0.15);
+}
+
+.selectTaskBtn:hover:not(:disabled) {
+  background: #0B726F;
+  box-shadow: 0 4px 12px rgba(14, 135, 132, 0.25);
+}
+
+.selectTaskBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* ─── Search ─────────────────────────────────────────────────── */
-.search {
-  width: 100%;
-  padding: 0.6rem 1rem;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  box-sizing: border-box;
+/* Right-Click Context Menu */
+.contextMenu {
+  position: fixed;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  padding: 6px;
+  z-index: 999;
+  min-width: 190px;
+  animation: menuFadeIn 0.12s ease-out;
 }
 
-.search:focus {
-  outline: none;
-  border-color: #1677ff;
-  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.08);
+@keyframes menuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
-/* ─── Summary ────────────────────────────────────────────────── */
-.summary {
+.contextMenuHeader {
+  padding: 6px 10px 4px 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94A3B8;
+  border-bottom: 1px solid #F1F5F9;
+  margin-bottom: 4px;
+}
+
+.contextMenuItem {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  font-size: 0.75rem;
-  color: #6b7280;
-  padding: 0 0.25rem;
-}
-
-.dot {
-  color: #d1d5db;
-}
-
-/* ─── List ───────────────────────────────────────────────────── */
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  max-height: 430px;
-  overflow-y: auto;
-  padding-right: 2px;
-}
-
-/* ─── Card ───────────────────────────────────────────────────── */
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  padding: 0.7rem 1rem;
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
   cursor: pointer;
   text-align: left;
-  width: 100%;
-  box-sizing: border-box;
-  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  transition: all 0.12s ease;
 }
 
-.card:hover {
-  border-color: #91caff;
-  box-shadow: 0 1px 4px rgba(22, 119, 255, 0.08);
+.contextMenuItem:hover {
+  background: #F1F5F9;
+  color: #0F172A;
 }
 
-.card.selected {
-  border-color: #1677ff;
-  background: #e6f4ff;
-}
-
-/* Subtask card — uses standard white background now */
-.card.subtaskCard {
-  background: #ffffff;
-}
-
-.card.subtaskCard .name {
-  color: #1677ff;
-}
-
-.card.subtaskCard.selected {
-  background: #e6f4ff;
-  border-color: #1677ff;
-}
-
-/* ─── Card top row (title + badge) ──────────────────────────── */
-.cardTop {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-}
-
-.name {
-  font-weight: 500;
-  font-size: 0.875rem;
-  color: #1e293b;
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ─── Subtask badge ──────────────────────────────────────────── */
-.subtaskBadge {
+.contextMenuItem svg {
+  color: #64748B;
   flex-shrink: 0;
-  background: #e6f4ff;
-  color: #1677ff;
-  border: 1px solid #91caff;
-  border-radius: 4px;
-  padding: 1px 6px;
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
 }
 
-.badgeL2 {
-  background: #e6f4ff;
-  color: #0958d9;
-  border: 1px solid #91caff;
+.contextMenuItem:hover svg {
+  color: #4F46E5;
 }
 
-.badgeL3 {
-  background: #f6ffed;
-  color: #389e0d;
-  border: 1px solid #b7eb8f;
-}
-
-.badgeL4 {
-  background: #fff7e6;
-  color: #d46b08;
-  border: 1px solid #ffd591;
-}
-
-/* ─── Parent breadcrumb ──────────────────────────────────────── */
-.parentBreadcrumb {
-  font-size: 0.725rem;
-  color: #64748b;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-top: -2px;
-}
-
-.breadcrumbArrow {
-  color: #94a3b8;
-  font-weight: 600;
-  font-size: 0.8rem;
-}
-
-.parentText {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ─── Meta ───────────────────────────────────────────────────── */
-.meta {
-  font-size: 0.75rem;
-  color: #64748b;
-}
-
-/* ─── States ─────────────────────────────────────────────────── */
-.loading,
-.empty {
-  text-align: center;
-  padding: 2rem;
-  color: #94a3b8;
-  font-size: 0.875rem;
-}
-
-/* ─── Circle Button ──────────────────────────────────────────── */
-.completeCircle {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 2px solid #94a3b8;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
-  margin-right: 8px;
-  transition: border-color 0.2s;
-}
-
-.completeCircle:hover {
-  border-color: #1677ff;
-}
-
-/* ─── Modal ──────────────────────────────────────────────────── */
-.modalOverlay {
+/* Review Status & Complete Task Confirmation Modal matching Reference Design (Screenshot 2) */
+.confirmModalOverlay {
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.4);
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  padding: 16px;
+  animation: modalFadeIn 0.15s ease-out;
 }
 
-.modalContent {
-  background: white;
-  padding: 1.5rem;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 320px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-.modalTitle {
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin: 0 0 0.5rem 0;
-  color: #1e293b;
+.confirmModalCard {
+  background: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+  width: 100%;
+  max-width: 380px;
+  animation: modalCardScale 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.modalText {
-  font-size: 0.9rem;
-  color: #64748b;
-  margin: 0 0 1.25rem 0;
+@keyframes modalCardScale {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
-.modalActions {
+.confirmModalTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 10px 0;
+  letter-spacing: -0.01em;
+}
+
+.confirmModalText {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #4B5563;
+  margin: 0 0 24px 0;
+}
+
+.confirmModalActions {
   display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
+  gap: 12px;
 }
 
-.modalCancelBtn {
-  padding: 0.5rem 1rem;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: white;
+.confirmCancelBtn {
+  flex: 1;
+  padding: 10px 16px;
+  border: 1px solid #D1D5DB;
+  background: #FFFFFF;
+  color: #374151;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  font-size: 0.875rem;
+  transition: all 0.15s ease;
 }
 
-.modalCompleteBtn {
-  padding: 0.5rem 1rem;
+.confirmCancelBtn:hover:not(:disabled) {
+  background: #F9FAFB;
+  border-color: #9CA3AF;
+}
+
+.confirmActionBtn {
+  flex: 1;
+  padding: 10px 16px;
   border: none;
-  border-radius: 6px;
-  background: #5a32fa;
-  color: white;
+  background: #4F46E5;
+  color: #FFFFFF;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  font-size: 0.875rem;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px 0 rgba(79, 70, 229, 0.2);
 }
 
-.modalCompleteBtn:disabled, .modalCancelBtn:disabled {
-  opacity: 0.5;
+.confirmActionBtn:hover:not(:disabled) {
+  background: #4338CA;
+}
+
+.confirmActionBtn:disabled,
+.confirmCancelBtn:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
 }
-
