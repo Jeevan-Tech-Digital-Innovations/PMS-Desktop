@@ -64,6 +64,14 @@ const RotateIcon = () => (
   </svg>
 );
 
+const RefreshIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="23 4 23 10 17 10" />
+    <polyline points="1 20 1 14 7 14" />
+    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+  </svg>
+);
+
 export function Tasks() {
   const navigate = useNavigate();
   const { projectId } = useParams<{ projectId: string }>();
@@ -99,14 +107,26 @@ export function Tasks() {
 
   const activeProject = draftProject || selectedProject;
   const queryClient = useQueryClient();
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
   const queryKey = ['assignedItems', projectId, userId];
 
-  const { data: items = [], isLoading, refetch } = useQuery({
+  const { data: items = [], isLoading, refetch, isRefetching } = useQuery({
     queryKey,
     queryFn: () => fetchAssignedItems(Number(projectId), userId),
     enabled: !!projectId,
   });
+
+  const handleRefresh = async () => {
+    setIsManualRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: ['assignedItems'] });
+      await queryClient.invalidateQueries({ queryKey: ['projects'] });
+      await refetch();
+    } finally {
+      setIsManualRefreshing(false);
+    }
+  };
 
   // Close context menu on outside click or escape
   useEffect(() => {
@@ -126,14 +146,55 @@ export function Tasks() {
     };
   }, [isUpdatingStatus]);
 
+  // Allowed lowercase status keys for Task page
+  const ALLOWED_TASK_STATUS_KEYS = new Set(['opentask', 'inprogress', 're-assigned']);
+
+  const normalizeStatusToKey = (raw?: string | null): string => {
+    const s = String(raw || '').toLowerCase().trim();
+    if (s === 'opentask') return 'opentask';
+    if (s === 'inprogress') return 'inprogress';
+    if (s === 're-assigned' || s === 'reassigned') return 're-assigned';
+    if (s.includes('completed') || s.includes('done')) return 'completed';
+    if (s.includes('review') || s.includes('need to review') || s.includes('need_to_review')) return 'review';
+    if (s.includes('progress')) return 'inprogress';
+    if (s.includes('hold')) return 'onhold';
+    if (s.includes('re-assign') || s.includes('reassign')) return 're-assigned';
+    return 'opentask';
+  };
+
   // Track currently highlighted task in list
   const currentSelectedId = draftTask?.id || selectedTask?.id;
 
   const displayedList = useMemo(() => {
-    if (!search.trim()) return items;
+    // Only display tasks whose status matches: 'opentask', 'inprogress', 're-assigned'
+    // Hide all other statuses, such as 'review', 'completed', and 'onhold'
+    const filtered = items.filter((i) => ALLOWED_TASK_STATUS_KEYS.has(normalizeStatusToKey(i.status)));
+    if (!search.trim()) return filtered;
     const q = search.toLowerCase();
-    return items.filter((i) => i.title.toLowerCase().includes(q));
+    return filtered.filter((i) => i.title.toLowerCase().includes(q));
   }, [items, search]);
+
+  const handleStartTask = async (e: React.MouseEvent, item: AssignedItem) => {
+    e.stopPropagation();
+    try {
+      setIsUpdatingStatus(true);
+      const sKey = normalizeStatusToKey(item.status);
+      if (sKey !== 'inprogress') {
+        await updateTaskStatus(item.id, 'inprogress', item.title);
+        toast.success(`Task "${item.title}" moved to In progress`);
+      }
+      const updatedItem = { ...item, status: 'inprogress' };
+      setDraftTask(updatedItem);
+      commitDraftSelection();
+      await queryClient.invalidateQueries({ queryKey });
+      await refetch();
+      navigate('/dashboard');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to start task');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
 
   const handleCardClick = (item: AssignedItem) => {
     setDraftTask(item);
@@ -216,11 +277,11 @@ export function Tasks() {
   };
 
   const handleConfirmSelect = () => {
-    if (draftTask) {
+    if (draftTask && ALLOWED_TASK_STATUS_KEYS.has(normalizeStatusToKey(draftTask.status))) {
       commitDraftSelection();
       navigate('/dashboard');
-    } else if (items.length > 0) {
-      setDraftTask(items[0]);
+    } else if (displayedList.length > 0) {
+      setDraftTask(displayedList[0]);
       commitDraftSelection();
       navigate('/dashboard');
     } else {
@@ -241,6 +302,9 @@ export function Tasks() {
 
   const normalizeStatus = (raw?: string | null): string => {
     const s = String(raw || '').toLowerCase().trim();
+    if (s === 'opentask') return 'Open task';
+    if (s === 'inprogress') return 'In progress';
+    if (s === 're-assigned' || s === 'reassigned') return 'Re-assigned';
     if (s.includes('completed')) return 'Completed';
     if (s.includes('need to review') || s.includes('need_to_review') || s.includes('review')) return 'Need to review';
     if (s.includes('progress')) return 'In progress';
@@ -250,11 +314,12 @@ export function Tasks() {
   };
 
   const getStatusBadgeClass = (status?: string | null) => {
-    const norm = normalizeStatus(status);
-    if (norm === 'Completed') return styles.statusCompleted;
-    if (norm === 'Need to review') return styles.statusReview;
-    if (norm === 'In progress') return styles.statusInProgress;
-    if (norm === 'On Hold') return styles.statusOnHold;
+    const key = normalizeStatusToKey(status);
+    if (key === 'inprogress') return styles.statusInProgress;
+    if (key === 're-assigned') return styles.statusReassigned || styles.statusOpen;
+    if (key === 'review') return styles.statusReview;
+    if (key === 'completed') return styles.statusCompleted;
+    if (key === 'onhold') return styles.statusOnHold;
     return styles.statusOpen;
   };
 
@@ -262,7 +327,7 @@ export function Tasks() {
 
   return (
     <div className={styles.container}>
-      {/* Header with Back button and Title; Create Task button removed */}
+      {/* Header with Back button and Title; Refresh button */}
       <div className={styles.header}>
         <button
           className={styles.backBtn}
@@ -273,6 +338,17 @@ export function Tasks() {
           <ArrowLeftIcon />
         </button>
         <h2 className={styles.title}>{isSubTaskMode ? 'Select Sub-Task' : 'Select Task'}</h2>
+        <button
+          className={styles.refreshBtn}
+          onClick={handleRefresh}
+          disabled={isRefetching || isManualRefreshing}
+          title={isSubTaskMode ? 'Refresh sub-tasks' : 'Refresh tasks'}
+          aria-label="Refresh"
+        >
+          <span className={isRefetching || isManualRefreshing ? styles.spinning : ''}>
+            <RefreshIcon />
+          </span>
+        </button>
       </div>
 
       {/* Project Selector Box */}
@@ -334,7 +410,11 @@ export function Tasks() {
                 onContextMenu={(e) => handleContextMenu(e, item)}
               >
                 <div className={styles.cardLeft}>
-                  <div className={styles.playBadge}>
+                  <div
+                    className={styles.playBadge}
+                    title="Start task (In progress)"
+                    onClick={(e) => handleStartTask(e, item)}
+                  >
                     <PlayIcon />
                   </div>
                   <div className={styles.textContainer}>

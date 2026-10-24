@@ -42,6 +42,41 @@
   line-height: 1.2;
 }
 
+.refreshBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.refreshBtn:hover:not(:disabled) {
+  background: #F1F5F9;
+  color: #0F172A;
+}
+
+.refreshBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spinning {
+  display: flex;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Project Selector Box matching Frame 6 & 7 */
 .projectSelectorBox {
   display: flex;
@@ -186,7 +221,15 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: all 0.15s ease;
+  transition: all 0.18s ease;
+  cursor: pointer;
+}
+
+.playBadge:hover {
+  background: #008080;
+  color: #FFFFFF;
+  transform: scale(1.1);
+  box-shadow: 0 2px 6px rgba(0, 128, 128, 0.25);
 }
 
 .textContainer {
@@ -253,6 +296,12 @@
   background: #F3F4F6;
   color: #4B5563;
   border: 1px solid #E5E7EB;
+}
+
+.statusReassigned {
+  background: #F8FAFC;
+  color: #475569;
+  border: 1px solid #CBD5E1;
 }
 
 .taskSubtitle {

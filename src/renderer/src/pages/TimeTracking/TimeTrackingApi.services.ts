@@ -125,9 +125,8 @@ export async function getPreviousSecondsForTask(
 
     if (!Array.isArray(logs) || logs.length === 0) return 0;
 
+    let totalDurationSec = 0;
     const intervals: Array<{ start: number; end: number }> = [];
-    const today = new Date();
-    const startOfTodayMs = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
 
     const parseLogTime = (timeStr: string) => {
       let str = timeStr;
@@ -136,45 +135,44 @@ export async function getPreviousSecondsForTask(
     };
 
     for (const log of logs) {
-      // Only count completed work logs (endTime present) for this task today
-      if (
-        String(log.taskId) === String(taskId) &&
-        log.endTime &&
-        log.startTime &&
-        log.timeType !== 'IDLE' &&
-        log.timeType !== 'AWAY' &&
-        log.timeType !== 'BREAK'
-      ) {
-        const logStart = parseLogTime(log.startTime);
-        const logEnd = parseLogTime(log.endTime);
-        if (logEnd > logStart && logEnd >= startOfTodayMs) {
-          intervals.push({
-            start: Math.max(logStart, startOfTodayMs),
-            end: logEnd,
-          });
+      if (String(log.taskId) === String(taskId)) {
+        const tType = String(log.timeType || '').toUpperCase();
+        if (tType === 'BREAK' || tType === 'IDLE' || tType === 'AWAY') {
+          continue;
+        }
+
+        if (log.durationSeconds != null && Number(log.durationSeconds) > 0) {
+          totalDurationSec += Number(log.durationSeconds);
+        } else if (log.durationMinutes != null && Number(log.durationMinutes) > 0) {
+          totalDurationSec += Number(log.durationMinutes) * 60;
+        } else if (log.startTime) {
+          const logStart = parseLogTime(log.startTime);
+          const logEnd = log.endTime ? parseLogTime(log.endTime) : Date.now();
+          if (logEnd > logStart) {
+            intervals.push({ start: logStart, end: logEnd });
+          }
         }
       }
     }
 
-    if (intervals.length === 0) return 0;
-
-    // Merge overlapping intervals to prevent double counting
-    intervals.sort((a, b) => a.start - b.start);
-    const merged: Array<{ start: number; end: number }> = [intervals[0]];
-    for (let i = 1; i < intervals.length; i++) {
-      const last = merged[merged.length - 1];
-      if (intervals[i].start <= last.end) {
-        last.end = Math.max(last.end, intervals[i].end);
-      } else {
-        merged.push(intervals[i]);
+    if (intervals.length > 0) {
+      intervals.sort((a, b) => a.start - b.start);
+      const merged: Array<{ start: number; end: number }> = [intervals[0]];
+      for (let i = 1; i < intervals.length; i++) {
+        const last = merged[merged.length - 1];
+        if (intervals[i].start <= last.end) {
+          last.end = Math.max(last.end, intervals[i].end);
+        } else {
+          merged.push(intervals[i]);
+        }
       }
+      const intervalSec = Math.floor(
+        merged.reduce((acc, curr) => acc + (curr.end - curr.start) / 1000, 0)
+      );
+      totalDurationSec = Math.max(totalDurationSec, intervalSec);
     }
 
-    const previousSecondsToday = Math.floor(
-      merged.reduce((acc, curr) => acc + (curr.end - curr.start) / 1000, 0)
-    );
-
-    return previousSecondsToday;
+    return totalDurationSec;
   } catch (err) {
     console.error('Error calculating previous seconds for task:', err);
     return 0;

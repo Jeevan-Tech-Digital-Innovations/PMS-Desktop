@@ -222,8 +222,25 @@ export async function fetchAssignedItems(
     extractNested(t);
   }
 
-  // 4. Iteratively querying subtasks is removed because the `/tasks` endpoint already 
-  // returns the complete task hierarchy including all subtasks in a single payload.
+  // 4. Fetch subtasks for top-level tasks from /tasks/{taskId}/subtasks
+  const topTasks = Array.from(taskMap.values()).filter((t) => !t.parentTaskId);
+  await Promise.all(
+    topTasks.map(async (t) => {
+      try {
+        const { data } = await apiClient.get<Task[]>(API_ENDPOINTS.SUB_TASKS(t.id));
+        const subList: any[] = Array.isArray(data) ? data : (data as any)?.content || [];
+        for (const s of subList) {
+          if (s) {
+            if (!s.parentTaskId) s.parentTaskId = t.id;
+            addTask(s);
+            extractNested(s);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    })
+  );
 
   // 5. Build assigned items list with level and parent title
   const result: AssignedItem[] = [];
