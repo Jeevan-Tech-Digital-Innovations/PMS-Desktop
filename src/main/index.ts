@@ -208,11 +208,8 @@ async function captureAndUploadScreenshot(timeLogId: number): Promise<void> {
   const { keyboardActivity, mouseActivity } = getActivityPercentages();
   resetActivityCounters();
 
-  const pad = (n: number) => (n < 10 ? '0' + n : n);
   const now = new Date();
-  const capturedAt = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
-    now.getDate(),
-  )}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}.000Z`;
+  const capturedAt = now.toISOString();
 
   const uploadSuccess = await uploadScreenshot({
     timeLogId,
@@ -431,6 +428,13 @@ function registerIpcHandlers(): void {
 
   // Timer stop
   ipcMain.on(IPC.TIMER_STOP, async () => {
+    if (currentTimeLogId) {
+      try {
+        await captureAndUploadScreenshot(currentTimeLogId);
+      } catch (err) {
+        logger.error('Failed to capture final screenshot on timer stop', err);
+      }
+    }
     await flushHeartbeat();
     await flushAppActivity();
     stopAllBackgroundServices();
