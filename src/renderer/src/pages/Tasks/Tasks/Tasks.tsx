@@ -444,6 +444,23 @@ export function Tasks() {
                       {subtitleDate}
                       {timeBudgetStr}
                     </span>
+                    {item.description && item.description.trim() && !item.description.toLowerCase().startsWith('changed status') && (
+                      <div
+                        className={`${styles.feedbackNoteBox} ${
+                          normalizeStatusToKey(item.status) === 're-assigned'
+                            ? styles.feedbackReassigned
+                            : ''
+                        }`}
+                        title={item.description}
+                      >
+                        <span className={styles.feedbackLabel}>
+                          {normalizeStatusToKey(item.status) === 're-assigned'
+                            ? 'Feedback:'
+                            : 'Note:'}
+                        </span>
+                        <span className={styles.feedbackText}>{item.description}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

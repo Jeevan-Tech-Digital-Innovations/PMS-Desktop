@@ -128,6 +128,24 @@ export async function getPreviousSecondsForTask(
     let totalDurationSec = 0;
     const intervals: Array<{ start: number; end: number }> = [];
 
+    const now = new Date();
+    const todayYear = now.getFullYear();
+    const todayMonth = now.getMonth();
+    const todayDate = now.getDate();
+
+    const isLogFromToday = (timeStr?: string) => {
+      if (!timeStr) return false;
+      let str = timeStr;
+      if (str.includes(' ') && !str.includes('T')) str = str.replace(' ', 'T');
+      const d = new Date(str);
+      return (
+        !isNaN(d.getTime()) &&
+        d.getFullYear() === todayYear &&
+        d.getMonth() === todayMonth &&
+        d.getDate() === todayDate
+      );
+    };
+
     const parseLogTime = (timeStr: string) => {
       let str = timeStr;
       if (str.includes(' ') && !str.includes('T')) str = str.replace(' ', 'T');
@@ -136,6 +154,11 @@ export async function getPreviousSecondsForTask(
 
     for (const log of logs) {
       if (String(log.taskId) === String(taskId)) {
+        // Exclude logs from previous days — suitcase only tracks TODAY
+        if (log.startTime && !isLogFromToday(log.startTime)) {
+          continue;
+        }
+
         const tType = String(log.timeType || '').toUpperCase();
         if (tType === 'BREAK' || tType === 'IDLE' || tType === 'AWAY') {
           continue;
