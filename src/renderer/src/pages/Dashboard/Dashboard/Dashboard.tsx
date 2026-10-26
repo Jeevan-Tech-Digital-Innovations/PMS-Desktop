@@ -13,6 +13,7 @@ import {
   getAccumulatedSecondsToday,
   getTaskAccumulatedSecondsToday,
 } from '@/pages/TimeTracking/TimeTrackingApi.services';
+import { updateTaskStatus } from '@/pages/Tasks/TasksApi.services';
 import { stopBreak } from '@/services/BreakApi.services';
 import styles from './Dashboard.module.css';
 
@@ -159,7 +160,7 @@ export function Dashboard() {
     },
   });
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (!selectedProject) {
       navigate('/projects');
       return;
@@ -168,6 +169,18 @@ export function Dashboard() {
       navigate(`/tasks/${selectedProject.id}`);
       return;
     }
+
+    // Ensure status transitions to 'inprogress' when starting task
+    const curStatus = String(selectedTask.status || '').toLowerCase().trim();
+    if (curStatus !== 'inprogress' && !curStatus.includes('progress')) {
+      try {
+        await updateTaskStatus(selectedTask.id, 'inprogress', selectedTask.title);
+        useProjectStore.getState().setSelectedTask({ ...selectedTask, status: 'inprogress' });
+      } catch (err) {
+        console.warn('Could not update task status prior to starting timer:', err);
+      }
+    }
+
     startMutation.mutate({ taskId: selectedTask.id });
   };
 
