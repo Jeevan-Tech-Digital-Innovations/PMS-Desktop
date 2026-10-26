@@ -402,6 +402,16 @@ export function Tasks() {
               ? `${formatDateDisplay(item.startDate)} – ${formatDateDisplay(item.dueDate)}`
               : (item.startDate ? `Started ${formatDateDisplay(item.startDate)}` : 'No start date – Today');
 
+            const hasEst = item.estimatedTime && item.estimatedTime !== '00:00:00';
+            const hasActual = item.actualTime && item.actualTime !== '00:00:00';
+            const timeBudgetStr = hasEst && hasActual
+              ? ` · ${item.actualTime} / ${item.estimatedTime}`
+              : hasEst
+                ? ` · Est: ${item.estimatedTime}`
+                : hasActual
+                  ? ` · Spent: ${item.actualTime}`
+                  : '';
+
             return (
               <div
                 key={`${item.itemType}-${item.id}`}
@@ -420,6 +430,11 @@ export function Tasks() {
                   <div className={styles.textContainer}>
                     <div className={styles.titleRow}>
                       <span className={styles.taskTitle}>{item.title}</span>
+                      {item.itemType === 'subtask' && (
+                        <span className={styles.subtaskBadge}>
+                          {item.level > 2 ? `Sub-task (L${item.level})` : 'Sub-task'}
+                        </span>
+                      )}
                       <span className={`${styles.statusBadge} ${getStatusBadgeClass(item.status)}`}>
                         {normalizeStatus(item.status)}
                       </span>
@@ -427,6 +442,7 @@ export function Tasks() {
                     <span className={styles.taskSubtitle}>
                       {item.parentTaskTitle ? `↳ ${item.parentTaskTitle} · ` : ''}
                       {subtitleDate}
+                      {timeBudgetStr}
                     </span>
                   </div>
                 </div>

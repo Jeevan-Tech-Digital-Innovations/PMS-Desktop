@@ -14,6 +14,11 @@ export interface Task {
   billable: boolean;
   list: string;
   estimatedTime: string;
+  actualTime?: string;
+  parentTaskName?: string;
+  milestoneId?: number | null;
+  tags?: string[];
+  taskTypeId?: number | null;
   timeLogs: TimeLogEntry[];
   subTasks: Task[];
 }

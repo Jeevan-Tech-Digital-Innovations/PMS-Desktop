@@ -257,6 +257,19 @@
   max-width: 170px;
 }
 
+.subtaskBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #0E8784;
+  background: #E6F7F7;
+  border: 1px solid #B2E5E3;
+  white-space: nowrap;
+}
+
 .statusBadge {
   display: inline-flex;
   align-items: center;

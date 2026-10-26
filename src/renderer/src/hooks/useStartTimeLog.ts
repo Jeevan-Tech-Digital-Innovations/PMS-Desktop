@@ -16,6 +16,15 @@ export function useStartTimeLog() {
     onSuccess: async (data, variables) => {
       setActiveTimeLog(data);
 
+      // Ensure active selectedTask status is inprogress
+      const currentSelected = useProjectStore.getState().selectedTask;
+      if (currentSelected && currentSelected.id === variables.taskId) {
+        useProjectStore.getState().setSelectedTask({
+          ...currentSelected,
+          status: 'inprogress',
+        });
+      }
+
       // Mark a local start so the sync grace period activates.
       // Must be called BEFORE startTimer to cover the API propagation delay.
       markLocalTimerStart();

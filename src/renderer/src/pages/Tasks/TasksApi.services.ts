@@ -132,6 +132,7 @@ function getRootTaskId(task: any, taskMap: Map<number, any>): number {
  * Retrieve the parent task title if available
  */
 function getParentTitle(task: any, taskMap: Map<number, any>): string | undefined {
+  if (task.parentTaskName) return task.parentTaskName;
   if (!task.parentTaskId) return undefined;
   const parent = taskMap.get(Number(task.parentTaskId));
   return parent ? (parent.title || parent.projectTaskName) : undefined;
@@ -159,6 +160,10 @@ export async function fetchAssignedItems(
         id,
         title: t.title || t.projectTaskName || 'Untitled Task',
         parentTaskId: t.parentTaskId != null ? Number(t.parentTaskId) : null,
+        parentTaskName: t.parentTaskName || t.parentTaskTitle || undefined,
+        milestoneId: t.milestoneId != null ? Number(t.milestoneId) : null,
+        tags: Array.isArray(t.tags) ? t.tags : undefined,
+        taskTypeId: t.taskTypeId != null ? Number(t.taskTypeId) : null,
       });
     } else {
       const existing = taskMap.get(id);
@@ -168,6 +173,10 @@ export async function fetchAssignedItems(
         id,
         title: t.title || existing.title || t.projectTaskName || 'Untitled Task',
         parentTaskId: t.parentTaskId != null ? Number(t.parentTaskId) : existing.parentTaskId,
+        parentTaskName: t.parentTaskName || existing.parentTaskName || t.parentTaskTitle || existing.parentTaskTitle || undefined,
+        milestoneId: t.milestoneId != null ? Number(t.milestoneId) : existing.milestoneId,
+        tags: Array.isArray(t.tags) ? t.tags : existing.tags,
+        taskTypeId: t.taskTypeId != null ? Number(t.taskTypeId) : existing.taskTypeId,
       });
     }
   };

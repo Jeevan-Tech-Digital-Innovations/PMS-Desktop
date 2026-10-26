@@ -246,8 +246,14 @@ export function TimeTracking() {
           <h3 className={styles.projectName}>
             {selectedProject?.name || 'VP Tex'}
           </h3>
-          <p className={styles.taskName}>
+          <p className={styles.taskName} title={selectedTask?.title}>
+            {((selectedTask as any)?.parentTaskTitle || selectedTask?.parentTaskName)
+              ? `↳ ${(selectedTask as any)?.parentTaskTitle || selectedTask?.parentTaskName} · `
+              : ''}
             {selectedTask?.title || 'Select Task'}
+            {selectedTask?.estimatedTime && selectedTask.estimatedTime !== '00:00:00'
+              ? ` (Est: ${selectedTask.estimatedTime})`
+              : ''}
           </p>
         </div>
 
