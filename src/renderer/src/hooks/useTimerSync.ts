@@ -8,6 +8,7 @@ import {
   getActiveTimeLog,
   getAccumulatedSecondsToday,
   getTaskAccumulatedSecondsToday,
+  getTaskActualSeconds,
 } from '@/pages/TimeTracking/TimeTrackingApi.services';
 
 // Module-level timestamp — only set when the USER explicitly clicks Start locally.
@@ -128,15 +129,19 @@ export function useTimerSync() {
             } as any);
           }
 
-          const taskSec = await getTaskAccumulatedSecondsToday(activeLog.taskId).catch(() => 0);
+          const taskSec = await getTaskActualSeconds(activeLog.taskId).catch(() => 0);
           useTimerStore.getState().setTaskSeconds(taskSec);
 
           const elapsed = activeLog.startTime
             ? Math.max(0, Math.floor((Date.now() - new Date(activeLog.startTime).getTime()) / 1000))
             : 0;
 
+          const isAway = String(activeLog.timeType || '').toUpperCase() === 'AWAY';
           if (!useTimerStore.getState().isRunning) {
             useTimerStore.getState().startTimer(elapsed);
+          }
+          if (isAway && !useTimerStore.getState().isOnBreak) {
+            useTimerStore.getState().startBreak();
           }
         } else {
           // If server reports no active task log and local grace period has elapsed:
@@ -147,8 +152,8 @@ export function useTimerSync() {
           }
 
           const selTask = useProjectStore.getState().selectedTask;
-          if (selTask?.id) {
-            const taskSec = await getTaskAccumulatedSecondsToday(selTask.id).catch(() => 0);
+          if (selTask?.id && !useTimerStore.getState().isTaskRunning) {
+            const taskSec = await getTaskActualSeconds(selTask.id).catch(() => 0);
             useTimerStore.getState().setTaskSeconds(taskSec);
           }
         }

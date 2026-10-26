@@ -84,6 +84,26 @@ export async function getAccumulatedSecondsToday(): Promise<number> {
   }
 }
 
+export async function getTaskActualSeconds(taskId: number | string): Promise<number> {
+  if (!taskId) return 0;
+  try {
+    const { data } = await apiClient.get(`/tasks/${taskId}`);
+    const taskData = data?.data || data;
+    if (typeof taskData?.actualTimeSeconds === 'number' && !isNaN(taskData.actualTimeSeconds)) {
+      return Math.max(0, taskData.actualTimeSeconds);
+    }
+    if (taskData?.actualTime && typeof taskData.actualTime === 'string') {
+      const parts = taskData.actualTime.trim().split(':').map((p: string) => parseInt(p, 10) || 0);
+      if (parts.length === 3) {
+        return Math.max(0, parts[0] * 3600 + parts[1] * 60 + parts[2]);
+      }
+    }
+  } catch (err) {
+    console.error('Failed to get task actual seconds from server:', err);
+  }
+  return getTaskAccumulatedSecondsToday(taskId);
+}
+
 export async function getTaskAccumulatedSecondsToday(taskId: number | string): Promise<number> {
   if (!taskId) return 0;
   try {

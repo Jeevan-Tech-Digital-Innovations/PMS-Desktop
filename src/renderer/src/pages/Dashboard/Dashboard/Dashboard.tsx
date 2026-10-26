@@ -12,6 +12,7 @@ import {
   getActiveTimeLog,
   getAccumulatedSecondsToday,
   getTaskAccumulatedSecondsToday,
+  getTaskActualSeconds,
 } from '@/pages/TimeTracking/TimeTrackingApi.services';
 import { updateTaskStatus } from '@/pages/Tasks/TasksApi.services';
 import { stopBreak } from '@/services/BreakApi.services';
@@ -114,7 +115,7 @@ export function Dashboard() {
       try {
         const [dailyTotal, taskTotal] = await Promise.all([
           getAccumulatedSecondsToday().catch(() => 0),
-          selectedTask?.id ? getTaskAccumulatedSecondsToday(selectedTask.id).catch(() => 0) : Promise.resolve(0),
+          selectedTask?.id ? getTaskActualSeconds(selectedTask.id).catch(() => 0) : Promise.resolve(0),
         ]);
         if (isMounted) {
           const currentDaily = useTimerStore.getState().dailyTotalSeconds;
@@ -123,7 +124,7 @@ export function Dashboard() {
           } else if (dailyTotal > currentDaily) {
             setDailyTotalSeconds(dailyTotal);
           }
-          if (taskTotal !== undefined) {
+          if (taskTotal !== undefined && !isTaskRunning) {
             setTaskSeconds(taskTotal);
           }
         }
@@ -207,14 +208,23 @@ export function Dashboard() {
       if (!taskId) throw new Error('No task ID found to stop');
       return stopTimeLog(Number(taskId));
     },
-    onSuccess: async () => {
+    onSuccess: async (data: any) => {
       pauseTask();
       setActiveTimeLog(null);
       toast.success('Task paused. Overall workday timer is still running.');
+
+      // 1. Immediately apply the exact accumulated seconds returned by the server
+      const returnedAccumulated = data?.accumulatedSecondsToday;
+      if (typeof returnedAccumulated === 'number' && returnedAccumulated >= 0) {
+        setTaskSeconds(returnedAccumulated);
+      }
+
+      // 2. Query official server totals to guarantee 100% parity with Web table
+      const targetTaskId = selectedTask?.id || activeTimeLog?.taskId;
       try {
         const [dailyTotal, taskTotal] = await Promise.all([
           getAccumulatedSecondsToday().catch(() => 0),
-          selectedTask?.id ? getTaskAccumulatedSecondsToday(selectedTask.id).catch(() => 0) : Promise.resolve(0),
+          targetTaskId ? getTaskActualSeconds(targetTaskId).catch(() => 0) : Promise.resolve(0),
         ]);
         const currentDaily = useTimerStore.getState().dailyTotalSeconds;
         if (!isOverallActive) {
@@ -225,7 +235,9 @@ export function Dashboard() {
         if (taskTotal !== undefined) {
           setTaskSeconds(taskTotal);
         }
-      } catch {}
+      } catch (err) {
+        console.error('Failed to sync times after stopping task:', err);
+      }
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to pause task timer');
@@ -291,7 +303,7 @@ export function Dashboard() {
     try {
       const [dailyTotal, taskTotal] = await Promise.all([
         getAccumulatedSecondsToday().catch(() => 0),
-        selectedTask?.id ? getTaskAccumulatedSecondsToday(selectedTask.id).catch(() => 0) : Promise.resolve(0),
+        selectedTask?.id ? getTaskActualSeconds(selectedTask.id).catch(() => 0) : Promise.resolve(0),
       ]);
       if (dailyTotal > 0) {
         setDailyTotalSeconds(dailyTotal);
