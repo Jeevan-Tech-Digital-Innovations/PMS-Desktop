@@ -15,6 +15,7 @@ import {
 } from '@/pages/TimeTracking/TimeTrackingApi.services';
 import { updateTaskStatus } from '@/pages/Tasks/TasksApi.services';
 import { stopBreak } from '@/services/BreakApi.services';
+import { apiClient } from '@/services/apiClient';
 import styles from './Dashboard.module.css';
 
 // SVG Icons matching Figma design
@@ -54,6 +55,13 @@ const PlayIcon = () => (
   </svg>
 );
 
+const PauseIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+    <rect x="6" y="4" width="4" height="16" rx="1" />
+    <rect x="14" y="4" width="4" height="16" rx="1" />
+  </svg>
+);
+
 const SquareIcon = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
     <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -71,6 +79,8 @@ export function Dashboard() {
   const navigate = useNavigate();
   const {
     isRunning,
+    isWorkdayRunning,
+    isTaskRunning,
     workSeconds,
     taskSeconds,
     dailyTotalSeconds,
@@ -78,11 +88,14 @@ export function Dashboard() {
     breakSeconds,
     isIdle,
     isOnBreak,
+    pauseTask,
     stopTimer,
     setTaskSeconds,
     setDailyTotalSeconds,
     stopBreak: stopBreakTimer,
   } = useTimerStore();
+
+  const isOverallActive = isWorkdayRunning || isRunning;
 
   const selectedProject = useProjectStore((s) => s.selectedProject);
   const selectedTask = useProjectStore((s) => s.selectedTask);
@@ -92,6 +105,7 @@ export function Dashboard() {
   const startMutation = useStartTimeLog();
 
   const [showStartedBanner, setShowStartedBanner] = useState(false);
+  const [reassignFeedback, setReassignFeedback] = useState<string | null>(null);
 
   // Synchronize daily total and task seconds on mount and whenever selected task changes
   useEffect(() => {
@@ -103,7 +117,10 @@ export function Dashboard() {
           selectedTask?.id ? getTaskAccumulatedSecondsToday(selectedTask.id).catch(() => 0) : Promise.resolve(0),
         ]);
         if (isMounted) {
-          if (dailyTotal > 0 || !isRunning) {
+          const currentDaily = useTimerStore.getState().dailyTotalSeconds;
+          if (!isOverallActive) {
+            setDailyTotalSeconds(dailyTotal);
+          } else if (dailyTotal > currentDaily) {
             setDailyTotalSeconds(dailyTotal);
           }
           if (taskTotal !== undefined) {
@@ -120,15 +137,69 @@ export function Dashboard() {
     };
   }, [selectedTask?.id]);
 
+  // Auto-fetch feedback note from activities for active task
   useEffect(() => {
-    if (isRunning) {
+    if (!selectedTask?.id) {
+      setReassignFeedback(null);
+      return;
+    }
+
+    const desc = String(selectedTask.description || '').trim();
+    const isSystemAudit = desc.toLowerCase().startsWith('changed status');
+
+    apiClient
+      .get(`/tasks/${selectedTask.id}/activities`)
+      .then(({ data }) => {
+        const acts = Array.isArray(data) ? data : ((data as any)?.data || []);
+        const sortedActs = acts.slice().sort((a: any, b: any) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          if (timeA !== timeB) return timeB - timeA;
+          return (Number(b.id) || 0) - (Number(a.id) || 0);
+        });
+
+        const noteAct = sortedActs.find((a: any) => {
+          const str = String(a.action || '');
+          return /note:\s*"/i.test(str) || (str.toLowerCase().includes('re-assigned') && /note:/i.test(str));
+        });
+
+        if (noteAct && noteAct.action) {
+          const match =
+            noteAct.action.match(/note:\s*"([^"]+)"/i) ||
+            noteAct.action.match(/note:\s*([^\n]+)/i);
+          if (match && match[1]?.trim()) {
+            const actualNote = match[1].trim();
+            setReassignFeedback(actualNote);
+            if (desc !== actualNote) {
+              useProjectStore.getState().setSelectedTask({
+                ...selectedTask,
+                description: actualNote,
+              });
+            }
+            return;
+          }
+        }
+
+        // If it was just a system audit log, purge it so it doesn't display as a note
+        if (isSystemAudit) {
+          useProjectStore.getState().setSelectedTask({
+            ...selectedTask,
+            description: '',
+          });
+        }
+      })
+      .catch(() => {});
+  }, [selectedTask?.id]);
+
+  useEffect(() => {
+    if (isTaskRunning) {
       setShowStartedBanner(true);
       const timer = setTimeout(() => setShowStartedBanner(false), 5000);
       return () => clearTimeout(timer);
     } else {
       setShowStartedBanner(false);
     }
-  }, [isRunning]);
+  }, [isTaskRunning]);
 
   const stopMutation = useMutation({
     mutationFn: (overrideTaskId?: number) => {
@@ -137,26 +208,29 @@ export function Dashboard() {
       return stopTimeLog(Number(taskId));
     },
     onSuccess: async () => {
-      stopTimer();
+      pauseTask();
       setActiveTimeLog(null);
-      window.electronAPI?.stopTimer();
-      toast.success('Timer stopped');
+      toast.success('Task paused. Overall workday timer is still running.');
       try {
         const [dailyTotal, taskTotal] = await Promise.all([
           getAccumulatedSecondsToday().catch(() => 0),
           selectedTask?.id ? getTaskAccumulatedSecondsToday(selectedTask.id).catch(() => 0) : Promise.resolve(0),
         ]);
-        setDailyTotalSeconds(dailyTotal);
+        const currentDaily = useTimerStore.getState().dailyTotalSeconds;
+        if (!isOverallActive) {
+          setDailyTotalSeconds(dailyTotal);
+        } else if (dailyTotal > currentDaily) {
+          setDailyTotalSeconds(dailyTotal);
+        }
         if (taskTotal !== undefined) {
           setTaskSeconds(taskTotal);
         }
       } catch {}
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to stop timer');
-      stopTimer();
+      toast.error(error.response?.data?.message || 'Failed to pause task timer');
+      pauseTask();
       setActiveTimeLog(null);
-      window.electronAPI?.stopTimer();
     },
   });
 
@@ -184,7 +258,7 @@ export function Dashboard() {
     startMutation.mutate({ taskId: selectedTask.id });
   };
 
-  const handleStop = async () => {
+  const handlePauseTask = async () => {
     const taskId = activeTimeLog?.taskId || selectedTask?.id;
     if (taskId) {
       stopMutation.mutate(Number(taskId));
@@ -197,9 +271,41 @@ export function Dashboard() {
         return;
       }
     } catch (e) {}
-    stopTimer();
-    window.electronAPI?.stopTimer();
+    pauseTask();
+    setActiveTimeLog(null);
   };
+
+  const handleClockOut = async () => {
+    const taskId = activeTimeLog?.taskId || selectedTask?.id;
+    if (isTaskRunning && taskId) {
+      try {
+        await stopTimeLog(Number(taskId));
+      } catch (e) {
+        console.error('Failed to stop task time log during clock out:', e);
+      }
+    }
+    stopTimer();
+    setActiveTimeLog(null);
+    window.electronAPI?.stopTimer();
+    toast.success('Clocked out for the day.');
+    try {
+      const [dailyTotal, taskTotal] = await Promise.all([
+        getAccumulatedSecondsToday().catch(() => 0),
+        selectedTask?.id ? getTaskAccumulatedSecondsToday(selectedTask.id).catch(() => 0) : Promise.resolve(0),
+      ]);
+      if (dailyTotal > 0) {
+        setDailyTotalSeconds(dailyTotal);
+      }
+      if (taskTotal !== undefined) {
+        setTaskSeconds(taskTotal);
+      }
+    } catch {}
+  };
+
+  const isTaskNeverStarted = (() => {
+    const status = String(selectedTask?.status || '').toLowerCase().trim();
+    return status === 'opentask' || status.includes('open') || taskSeconds === 0;
+  })();
 
   const handleBreakToggle = async () => {
     if (isOnBreak) {
@@ -220,7 +326,7 @@ export function Dashboard() {
   const totalTimeSeconds = workSeconds + idleSeconds + breakSeconds;
 
   const handleProjectCardClick = () => {
-    if (isRunning) return; // Don't change project while timer is running
+    if (isTaskRunning) return; // Don't change project while task timer is actively tracking
     if (!selectedProject) {
       navigate('/projects');
     } else {
@@ -232,7 +338,7 @@ export function Dashboard() {
     <div className={styles.container}>
       {/* Top Banner: "Timer started" alert badge matching Figma */}
       <div className={styles.bannerContainer}>
-        {isRunning && showStartedBanner && (
+        {isTaskRunning && showStartedBanner && (
           <div className={styles.startedBanner}>
             <CheckCircleIcon />
             <span>Timer started</span>
@@ -240,12 +346,17 @@ export function Dashboard() {
         )}
       </div>
 
-      {/* Status indicator: "• Ready" or "• Tracking" or "• Idle" */}
+      {/* Status indicator: "• Tracking Task" / "• On Duty (Task Paused)" / "• Ready" */}
       <div className={styles.statusSection}>
-        {isRunning ? (
+        {isTaskRunning ? (
           <div className={styles.statusTracking}>
             <span className={styles.trackingDot} />
             <span>{isIdle ? 'Idle' : isOnBreak ? 'On Break' : 'Tracking'}</span>
+          </div>
+        ) : isOverallActive ? (
+          <div className={styles.statusOnDuty}>
+            <span className={styles.onDutyDot} />
+            <span>On Duty (Task Paused)</span>
           </div>
         ) : (
           <div className={styles.statusReady}>
@@ -257,7 +368,7 @@ export function Dashboard() {
 
       {/* Main Digital Clock Display */}
       <div className={styles.timerSection}>
-        <div className={`${styles.mainTimer} ${isRunning ? styles.timerActive : styles.timerReady}`}>
+        <div className={`${styles.mainTimer} ${isOverallActive ? styles.timerActive : styles.timerReady}`}>
           {formatTime(dailyTotalSeconds)}
         </div>
 
@@ -277,9 +388,9 @@ export function Dashboard() {
 
       {/* Active Project & Task Selector Card */}
       <div
-        className={`${styles.activeProjectCard} ${isRunning ? styles.cardRunning : ''}`}
+        className={`${styles.activeProjectCard} ${isTaskRunning ? styles.cardRunning : ''}`}
         onClick={handleProjectCardClick}
-        title={isRunning ? 'Timer is running' : 'Click to select project or task'}
+        title={isTaskRunning ? 'Pause task to switch project or task' : 'Click to select project or task'}
       >
         <div className={styles.folderIconBadge}>
           <FolderIcon />
@@ -293,35 +404,51 @@ export function Dashboard() {
           <p className={styles.taskName}>
             {selectedTask?.title || 'Select Task'}
           </p>
+          {(() => {
+            const rawDesc = String(selectedTask?.description || '').trim();
+            const displayNote = reassignFeedback || (!rawDesc.toLowerCase().startsWith('changed status') ? rawDesc : null);
+            if (!displayNote) return null;
+            const isFeedback =
+              Boolean(reassignFeedback) ||
+              String(selectedTask?.status || '').toLowerCase().replace(/[^a-z]/g, '').includes('reassign');
+
+            return (
+              <div
+                className={`${styles.activeTaskNote} ${isFeedback ? styles.noteReassigned : ''}`}
+                title={displayNote}
+              >
+                <span className={styles.noteLabel}>
+                  {isFeedback ? 'Feedback:' : 'Note:'}
+                </span>{' '}
+                <span className={styles.noteBody}>{displayNote}</span>
+              </div>
+            );
+          })()}
         </div>
 
-        {!isRunning && (
+        {!isTaskRunning && (
           <div className={styles.cardChevron}>
             <ChevronSelectorIcon />
           </div>
         )}
       </div>
 
-      {/* Action Buttons: Single "Start" or Dual "Stop" / "Break" */}
+      {/* Action Buttons: 
+          1. isTaskRunning: Pause Task + Break
+          2. On duty (task paused): Start Task (if open/unworked) or Resume Task + Clock Out
+          3. Off duty (ready): Start
+      */}
       <div className={styles.actionsContainer}>
-        {!isRunning ? (
-          <button
-            className={styles.startBtn}
-            onClick={handleStart}
-            disabled={startMutation.isPending}
-          >
-            <PlayIcon />
-            <span>{startMutation.isPending ? 'Starting...' : 'Start'}</span>
-          </button>
-        ) : (
+        {isTaskRunning ? (
           <div className={styles.dualActions}>
             <button
               className={styles.stopBtn}
-              onClick={handleStop}
+              onClick={handlePauseTask}
               disabled={stopMutation.isPending}
+              title="Pause task tracking"
             >
-              <SquareIcon />
-              <span>{stopMutation.isPending ? 'Stopping...' : 'Stop'}</span>
+              <PauseIcon />
+              <span>{stopMutation.isPending ? 'Pausing...' : 'Pause Task'}</span>
             </button>
             <button
               className={`${styles.breakBtn} ${isOnBreak ? styles.breakBtnActive : ''}`}
@@ -331,6 +458,41 @@ export function Dashboard() {
               <span>{isOnBreak ? 'Back to Work' : 'Break'}</span>
             </button>
           </div>
+        ) : isOverallActive ? (
+          <div className={styles.dualActions}>
+            <button
+              className={styles.startBtn}
+              onClick={handleStart}
+              disabled={startMutation.isPending}
+              title={isTaskNeverStarted ? 'Start task tracking' : 'Resume task tracking'}
+            >
+              <PlayIcon />
+              <span>
+                {startMutation.isPending
+                  ? 'Starting...'
+                  : isTaskNeverStarted
+                    ? 'Start Task'
+                    : 'Resume Task'}
+              </span>
+            </button>
+            <button
+              className={styles.clockOutBtn}
+              onClick={handleClockOut}
+              title="End workday and stop overall tracking"
+            >
+              <SquareIcon />
+              <span>Clock Out</span>
+            </button>
+          </div>
+        ) : (
+          <button
+            className={styles.startBtn}
+            onClick={handleStart}
+            disabled={startMutation.isPending}
+          >
+            <PlayIcon />
+            <span>{startMutation.isPending ? 'Starting...' : 'Start'}</span>
+          </button>
         )}
       </div>
     </div>

@@ -32,7 +32,7 @@ export function useTimerSync() {
 
     const tickInterval = setInterval(() => {
       const state = useTimerStore.getState();
-      if (state.isRunning) {
+      if (state.isRunning || state.isWorkdayRunning || state.isTaskRunning) {
         tick();
         tickBreak();
 
@@ -105,7 +105,11 @@ export function useTimerSync() {
         ]);
 
         if (dailyTotal > 0) {
-          useTimerStore.getState().setDailyTotalSeconds(dailyTotal);
+          const state = useTimerStore.getState();
+          const isWorkdayActive = state.isWorkdayRunning || state.isRunning;
+          if (!isWorkdayActive || dailyTotal > state.dailyTotalSeconds) {
+            state.setDailyTotalSeconds(dailyTotal);
+          }
         }
 
         if (activeLog && activeLog.taskId) {
@@ -135,6 +139,13 @@ export function useTimerSync() {
             useTimerStore.getState().startTimer(elapsed);
           }
         } else {
+          // If server reports no active task log and local grace period has elapsed:
+          const isTaskActiveLocally = useTimerStore.getState().isTaskRunning;
+          if (isTaskActiveLocally && Date.now() - lastLocalStartTime > 10000) {
+            useTimerStore.getState().pauseTask();
+            useProjectStore.getState().setActiveTimeLog(null);
+          }
+
           const selTask = useProjectStore.getState().selectedTask;
           if (selTask?.id) {
             const taskSec = await getTaskAccumulatedSecondsToday(selTask.id).catch(() => 0);

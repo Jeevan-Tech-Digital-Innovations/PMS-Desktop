@@ -269,6 +269,63 @@ export async function fetchAssignedItems(
     return a.id - b.id;
   });
 
+  // 7. For any re-assigned tasks where description is missing or generic audit log, fetch the note from task activities
+  const reAssignedItemsWithoutDesc = result.filter((item) => {
+    const s = String(item.status || '').toLowerCase().replace(/[^a-z]/g, '');
+    const desc = String(item.description || '').trim();
+    return s === 'reassigned' && (!desc || desc.toLowerCase().startsWith('changed status'));
+  });
+
+  if (reAssignedItemsWithoutDesc.length > 0) {
+    await Promise.all(
+      reAssignedItemsWithoutDesc.map(async (item) => {
+        try {
+          const { data } = await apiClient.get(`/tasks/${item.id}/activities`);
+          const acts = Array.isArray(data) ? data : ((data as any)?.data || []);
+
+          // Sort activities strictly newest first (by createdAt and id)
+          const sortedActs = acts.slice().sort((a: any, b: any) => {
+            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            if (timeA !== timeB) return timeB - timeA;
+            return (Number(b.id) || 0) - (Number(a.id) || 0);
+          });
+
+          // 1. Prioritize finding the latest explicit re-assignment feedback note: 'Re-assigned ... with note: "..."'
+          const noteAct = sortedActs.find((a: any) => {
+            const str = String(a.action || '');
+            return /note:\s*"/i.test(str) || (str.toLowerCase().includes('re-assigned') && /note:/i.test(str));
+          });
+
+          if (noteAct && noteAct.action) {
+            const match =
+              noteAct.action.match(/note:\s*"([^"]+)"/i) ||
+              noteAct.action.match(/note:\s*([^\n]+)/i);
+            if (match && match[1]?.trim()) {
+              item.description = match[1].trim();
+              return;
+            }
+          }
+
+          // 2. Otherwise look for non-system audit re-assignment rework action
+          const reassignAct = sortedActs.find((a: any) => {
+            const actStr = String(a.action || '').toLowerCase();
+            return (actStr.includes('re-assigned') || actStr.includes('reassign')) && !actStr.startsWith('changed status');
+          });
+
+          if (reassignAct && reassignAct.action) {
+            const match =
+              reassignAct.action.match(/note:\s*"([^"]+)"/i) ||
+              reassignAct.action.match(/note:\s*([^\n]+)/i);
+            item.description = match ? match[1].trim() : reassignAct.action;
+          }
+        } catch {
+          // ignore
+        }
+      })
+    );
+  }
+
   return result;
 }
 
