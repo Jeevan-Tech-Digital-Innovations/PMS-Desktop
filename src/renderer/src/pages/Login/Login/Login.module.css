@@ -27,8 +27,8 @@
 
 .input:focus {
   outline: none;
-  border-color: #1677ff;
-  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.1);
+  border-color: #0E8784;
+  box-shadow: 0 0 0 3px rgba(14, 135, 132, 0.12);
 }
 
 .passwordWrapper {
@@ -46,7 +46,7 @@
   transform: translateY(-50%);
   background: none;
   border: none;
-  color: #1677ff;
+  color: #0E8784;
   font-size: 0.75rem;
   font-weight: 500;
   cursor: pointer;
@@ -70,12 +70,12 @@
 .checkbox input {
   width: 16px;
   height: 16px;
-  accent-color: #1677ff;
+  accent-color: #0E8784;
 }
 
 .forgotLink {
   font-size: 0.875rem;
-  color: #1677ff;
+  color: #0E8784;
   text-decoration: none;
 }
 
@@ -86,7 +86,7 @@
 .submitBtn {
   width: 100%;
   padding: 0.75rem;
-  background: #007B88;
+  background: #0E8784;
   color: white;
   font-weight: 600;
   font-size: 0.9375rem;
@@ -98,7 +98,7 @@
 }
 
 .submitBtn:hover:not(:disabled) {
-  background: #006370;
+  background: #0B726F;
 }
 
 .submitBtn:disabled {

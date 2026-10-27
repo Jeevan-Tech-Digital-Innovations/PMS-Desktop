@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, session, net, screen, shell, Notification } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, session, net, screen, shell, Notification, powerMonitor } from 'electron';
 import * as path from 'path';
 import { logger } from './utils/logger';
 import { authStore } from './utils/authStore';
@@ -57,16 +57,17 @@ function createWindow(): void {
 
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth } = primaryDisplay.workAreaSize;
-  const windowWidth = 400;
-  const windowHeight = 700;
+  const windowWidth = 360;
+  const windowHeight = 490;
 
   mainWindow = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
+    useContentSize: true,
     x: screenWidth - windowWidth - 20,
     y: 20,
     minWidth: 350,
-    minHeight: 600,
+    minHeight: 480,
     resizable: false,
     title: 'ENJEV | PMS Desktop',
     icon: path.join(__dirname, '../../resources/icon.png'),
@@ -219,7 +220,7 @@ async function captureAndUploadScreenshot(timeLogId: number): Promise<void> {
     capturedAt,
     keyboardActivity,
     mouseActivity,
-    activeWindowTitle: currentActiveWindowTitle,
+    activeWindowTitle: currentActiveWindowTitle || 'Unknown',
   });
 
   if (uploadSuccess) {
@@ -483,6 +484,9 @@ function registerIpcHandlers(): void {
     resumeActivityMonitor();
     resumeIdleMonitor();
 
+    // Immediately fire a heartbeat so the web portal shows "Working" status without waiting
+    flushHeartbeat().catch(err => logger.error('Failed to flush heartbeat on break stop', err));
+
     if (currentTimeLogId) {
       if (screenshotInterval) {
         clearInterval(screenshotInterval);
@@ -563,6 +567,17 @@ app.whenReady().then(() => {
   });
 
   registerIpcHandlers();
+
+  // Listen for system sleep/resume and screen lock/unlock to immediately refresh heartbeat
+  powerMonitor.on('resume', () => {
+    logger.info('[PowerMonitor] System resumed from sleep, refreshing heartbeat');
+    flushHeartbeat();
+  });
+  powerMonitor.on('unlock-screen', () => {
+    logger.info('[PowerMonitor] Screen unlocked, refreshing heartbeat');
+    flushHeartbeat();
+  });
+
   createWindow();
   createTray(mainWindow!);
 

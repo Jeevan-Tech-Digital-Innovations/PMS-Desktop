@@ -42,16 +42,24 @@ export function BreakModal() {
       return;
     }
 
+    const selectedReason = reasons.find(r => r.id === reasonId);
     try {
       setIsStarting(true);
-      const selectedReason = reasons.find(r => r.id === reasonId);
       await startBreak(activeTimeLog.id, reasonId);
       startBreakTimer(selectedReason?.reasonText);
       window.electronAPI?.startBreak();
       toast.success('Break started');
       closeBreakModal();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to start break');
+      const errMsg = error.response?.data?.message || '';
+      if (errMsg.toLowerCase().includes('already exists')) {
+        startBreakTimer(selectedReason?.reasonText);
+        window.electronAPI?.startBreak();
+        toast.success('Break started');
+        closeBreakModal();
+        return;
+      }
+      toast.error(errMsg || 'Failed to start break');
     } finally {
       setIsStarting(false);
     }

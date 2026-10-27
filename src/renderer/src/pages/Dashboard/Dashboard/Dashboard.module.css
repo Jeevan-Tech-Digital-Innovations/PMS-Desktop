@@ -1,221 +1,437 @@
 .container {
-  max-width: 600px;
-  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  height: 100%;
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto;
+  padding: 4px 0 8px 0;
+  justify-content: space-between;
 }
 
-.statusSection {
-  text-align: center;
+/* Banner container */
+.bannerContainer {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
 }
 
-.statusBadge {
+.startedBanner {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  font-size: 0.875rem;
+  gap: 6px;
+  background: #D1FAE5;
+  color: #065F46;
+  font-size: 12px;
   font-weight: 500;
+  padding: 4px 14px;
+  border-radius: 9999px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  animation: fadeInDown 0.25s ease-out;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Status section */
+.statusSection {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 8px;
 }
 
 .statusReady {
-  background: #f1f5f9;
-  color: #475569;
-}
-
-.statusReady .statusDot {
-  background: #94a3b8;
-}
-
-.statusWorking {
-  background: #f0fdf4;
-  color: #166534;
-}
-
-.statusWorking .statusDot {
-  background: #22c55e;
-}
-
-.statusPaused {
-  background: #fffbeb;
-  color: #92400e;
-}
-
-.statusPaused .statusDot {
-  background: #f59e0b;
-}
-
-.statusIdle {
-  background: #fffbeb;
-  color: #92400e;
-}
-
-.statusIdle .statusDot {
-  background: #f59e0b;
-}
-
-.statusDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #94a3b8;
-}
-
-.timerSection {
-  text-align: center;
-  padding: 2rem;
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.timer {
-  font-size: 3.5rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: #1e293b;
-  letter-spacing: -0.025em;
-}
-
-.counters {
   display: flex;
-  justify-content: center;
-  gap: 2rem;
-  margin-top: 1rem;
+  align-items: center;
+  gap: 5px;
+  color: #64748B;
+  font-size: 13px;
+  font-weight: 500;
 }
 
-.counter {
+.readyDot {
+  font-size: 18px;
+  line-height: 1;
+  color: #94A3B8;
+}
+
+.statusTracking {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #E6F4F1;
+  color: #0D9488;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 12px;
+  border-radius: 9999px;
+}
+
+.trackingDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #0D9488;
+  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.2);
+  animation: pulseDot 2s infinite;
+}
+
+.statusOnDuty {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #EFF6FF;
+  color: #2563EB;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 12px;
+  border-radius: 9999px;
+}
+
+.onDutyDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2563EB;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  animation: pulseDotBlue 2s infinite;
+}
+
+@keyframes pulseDotBlue {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(37, 99, 235, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+  }
+}
+
+@keyframes pulseDot {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.4);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(13, 148, 136, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(13, 148, 136, 0);
+  }
+}
+
+/* Timer Section */
+.timerSection {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  margin: 12px 0 24px 0;
 }
 
-.counterLabel {
-  font-size: 0.75rem;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.counterValue {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #374151;
-  font-variant-numeric: tabular-nums;
-}
-
-.idleActive {
-  color: #f59e0b;
-}
-
-.breakExceeded {
-  color: #ff4d4f !important;
+.mainTimer {
+  font-size: 46px;
   font-weight: 700;
-  animation: pulse 2s infinite;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  user-select: none;
 }
 
-@keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.7; }
-  100% { opacity: 1; }
+.timerReady {
+  color: #CBD5E1;
 }
 
-.projectCard {
+.timerActive {
+  color: #0F172A;
+}
+
+.subTimersRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem 1.25rem;
-  background: white;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
+  gap: 10px;
+  margin-top: 10px;
+  color: #64748B;
+  font-size: 12.5px;
+  font-weight: 500;
 }
 
-.projectInfo {
-  min-width: 0;
+.subTimerItem {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.subTimerDivider {
+  color: #CBD5E1;
+  font-size: 12px;
+  user-select: none;
+}
+
+/* Active Project & Task Selector Card */
+.activeProjectCard {
+  display: flex;
+  align-items: center;
+  padding: 12px 14px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-bottom: 20px;
+  user-select: none;
+}
+
+.activeProjectCard:hover:not(.cardRunning) {
+  border-color: #0E8784;
+  background: #FBFDFD;
+  box-shadow: 0 2px 8px rgba(14, 135, 132, 0.08);
+}
+
+.cardRunning {
+  cursor: default;
+}
+
+.folderIconBadge {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #E6F4F1;
+  color: #0D9488;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cardContent {
+  flex: 1;
+  margin-left: 12px;
+  overflow: hidden;
+}
+
+.cardLabel {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #64748B;
+  text-transform: uppercase;
+  line-height: 1.2;
+  margin-bottom: 2px;
 }
 
 .projectName {
-  font-weight: 600;
-  color: #1e293b;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0F172A;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.projectStatus {
-  font-size: 0.75rem;
-  color: #64748b;
-  margin-top: 0.25rem;
+.taskName {
+  font-size: 12px;
+  color: #64748B;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
 }
 
-.changeBtn {
+.activeTaskNote {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  padding: 3px 8px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #334155;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.noteReassigned {
+  background: #FFF7ED;
+  border-color: #FED7AA;
+}
+
+.noteLabel {
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.3px;
+  color: #EA580C;
   flex-shrink: 0;
-  padding: 0.5rem 0.875rem;
-  background: white;
-  color: #1677ff;
+}
+
+.noteBody {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+  color: #7C2D12;
   font-weight: 500;
-  font-size: 0.8125rem;
-  border: 1px solid #91caff;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.15s;
 }
 
-.changeBtn:hover {
-  background: #e6f4ff;
-  border-color: #1677ff;
+.cardChevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94A3B8;
+  margin-left: 8px;
+  flex-shrink: 0;
 }
 
-.selectBtn {
-  width: 100%;
-  padding: 0.875rem;
-  background: #1677ff;
-  color: white;
-  font-weight: 600;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.selectBtn:hover {
-  background: #4096ff;
+/* Action Buttons */
+.actionsContainer {
+  margin-top: auto;
 }
 
 .startBtn {
   width: 100%;
-  padding: 0.875rem;
-  background: #10b981;
-  color: white;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #0E8784;
+  color: #FFFFFF;
   border: none;
   border-radius: 10px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.startBtn:hover {
-  background: #059669;
-}
-
-.activitySection {
-  padding: 1.25rem;
-  background: white;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
-}
-
-.sectionTitle {
-  font-size: 0.875rem;
+  padding: 13px 20px;
+  font-size: 14px;
   font-weight: 600;
-  color: #374151;
-  margin-bottom: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(14, 135, 132, 0.15);
 }
 
-.activityPlaceholder {
-  font-size: 0.875rem;
-  color: #94a3b8;
-  text-align: center;
-  padding: 1rem 0;
+.startBtn:hover:not(:disabled) {
+  background: #0B726F;
+  box-shadow: 0 4px 12px rgba(14, 135, 132, 0.25);
+}
+
+.startBtn:active:not(:disabled) {
+  background: #085855;
+  transform: translateY(1px);
+}
+
+.startBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.dualActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dualActions .startBtn {
+  flex: 1;
+  width: auto;
+  padding: 12px 16px;
+}
+
+.stopBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #0E8784;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.stopBtn:hover:not(:disabled) {
+  background: #0B726F;
+}
+
+.stopBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.breakBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #FFFFFF;
+  color: #0E8784;
+  border: 1.5px solid #0E8784;
+  border-radius: 10px;
+  padding: 11px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.breakBtn:hover {
+  background: #E6F4F1;
+}
+
+.breakBtnActive {
+  background: #F59E0B;
+  border-color: #F59E0B;
+  color: #FFFFFF;
+}
+
+.breakBtnActive:hover {
+  background: #D97706;
+}
+
+.clockOutBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #FFFFFF;
+  color: #DC2626;
+  border: 1.5px solid #FCA5A5;
+  border-radius: 10px;
+  padding: 11px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clockOutBtn:hover {
+  background: #FEF2F2;
+  border-color: #DC2626;
 }

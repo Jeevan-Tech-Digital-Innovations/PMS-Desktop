@@ -3,16 +3,35 @@
 @tailwind utilities;
 
 :root {
-  --color-primary: #1677ff;
-  --color-primary-dark: #0958d9;
-  --color-primary-hover: #4096ff;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-danger: #ef4444;
-  --color-bg: #ffffff;
-  --color-surface: #ffffff;
-  --color-text: #1e293b;
-  --color-text-muted: #64748b;
+  --color-primary: #0E8784;
+  --color-primary-dark: #0B726F;
+  --color-primary-hover: #109B98;
+  --color-primary-light: #E6F4F1;
+  --color-primary-subtle: #F0F9F8;
+  --color-border: #E2E8F0;
+  --color-border-subtle: #F1F5F9;
+  --color-success: #10B981;
+  --color-success-bg: #D1FAE5;
+  --color-success-text: #065F46;
+  --color-warning: #F59E0B;
+  --color-danger: #DC2626;
+  --color-danger-hover: #B91C1C;
+  --color-bg: #FFFFFF;
+  --color-surface: #FFFFFF;
+  --color-text-title: #0F172A;
+  --color-text: #1E293B;
+  --color-text-body: #334155;
+  --color-text-muted: #64748B;
+  --color-text-subtle: #94A3B8;
+  --color-timer-ready: #CBD5E1;
+  --color-timer-active: #0F172A;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
+  --shadow-dropdown: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
 }
 
 * {
