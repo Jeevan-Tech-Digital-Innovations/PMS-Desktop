@@ -16,6 +16,8 @@ export const IPC = {
   TIMER_START: 'timer:start',
   TIMER_STOP: 'timer:stop',
   TIMER_TICK: 'timer:tick',
+  TIMER_OT_WARNING: 'timer:ot-warning',
+  TIMER_OT_ACTION: 'timer:ot-action',
 
   // Break
   BREAK_START: 'break:start',

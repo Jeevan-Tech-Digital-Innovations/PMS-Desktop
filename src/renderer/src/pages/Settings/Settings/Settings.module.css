@@ -1,80 +1,101 @@
 .container {
-  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  max-width: 360px;
   margin: 0 auto;
 }
 
-.backBtn {
-  background: none;
-  border: none;
-  color: #1677ff;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  padding: 0;
-  margin-bottom: 1rem;
+.header {
   display: flex;
   align-items: center;
-  transition: color 0.2s;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
 .backBtn:hover {
-  color: #0f172a;
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+  color: #0F172A;
 }
 
 .title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin-bottom: 1.5rem;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0;
 }
 
 .section {
-  background: white;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  padding: 1.25rem;
-  margin-bottom: 1rem;
+  background: #FFFFFF;
+  border-radius: 12px;
+  border: 1px solid #E2E8F0;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .sectionTitle {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid #f1f5f9;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0F172A;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #F1F5F9;
 }
 
 .field {
   display: flex;
   justify-content: space-between;
-  padding: 0.625rem 0;
+  align-items: center;
+  padding: 6px 0;
 }
 
 .label {
-  font-size: 0.875rem;
-  color: #64748b;
+  font-size: 13px;
+  color: #64748B;
 }
 
 .value {
-  font-size: 0.875rem;
+  font-size: 13px;
   font-weight: 500;
-  color: #1e293b;
+  color: #0F172A;
 }
 
 .checkBtn {
   width: 100%;
-  padding: 0.625rem;
-  margin-top: 0.75rem;
-  background: #f1f5f9;
-  color: #374151;
-  font-weight: 500;
-  font-size: 0.875rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
+  padding: 9px 14px;
+  margin-top: 10px;
+  background: #F8FAFC;
+  color: #0E8784;
+  font-weight: 600;
+  font-size: 13px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.15s ease;
 }
 
 .checkBtn:hover {
-  background: #e2e8f0;
+  background: #E6F4F1;
+  border-color: #0E8784;
 }
+

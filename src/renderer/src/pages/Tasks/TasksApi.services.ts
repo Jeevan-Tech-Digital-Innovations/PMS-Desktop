@@ -222,8 +222,25 @@ export async function fetchAssignedItems(
     extractNested(t);
   }
 
-  // 4. Iteratively querying subtasks is removed because the `/tasks` endpoint already 
-  // returns the complete task hierarchy including all subtasks in a single payload.
+  // 4. Fetch subtasks for top-level tasks from /tasks/{taskId}/subtasks
+  const topTasks = Array.from(taskMap.values()).filter((t) => !t.parentTaskId);
+  await Promise.all(
+    topTasks.map(async (t) => {
+      try {
+        const { data } = await apiClient.get<Task[]>(API_ENDPOINTS.SUB_TASKS(t.id));
+        const subList: any[] = Array.isArray(data) ? data : (data as any)?.content || [];
+        for (const s of subList) {
+          if (s) {
+            if (!s.parentTaskId) s.parentTaskId = t.id;
+            addTask(s);
+            extractNested(s);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    })
+  );
 
   // 5. Build assigned items list with level and parent title
   const result: AssignedItem[] = [];
@@ -252,8 +269,88 @@ export async function fetchAssignedItems(
     return a.id - b.id;
   });
 
+  // 7. For any re-assigned tasks where description is missing or generic audit log, fetch the note from task activities
+  const reAssignedItemsWithoutDesc = result.filter((item) => {
+    const s = String(item.status || '').toLowerCase().replace(/[^a-z]/g, '');
+    const desc = String(item.description || '').trim();
+    return s === 'reassigned' && (!desc || desc.toLowerCase().startsWith('changed status'));
+  });
+
+  if (reAssignedItemsWithoutDesc.length > 0) {
+    await Promise.all(
+      reAssignedItemsWithoutDesc.map(async (item) => {
+        try {
+          const { data } = await apiClient.get(`/tasks/${item.id}/activities`);
+          const acts = Array.isArray(data) ? data : ((data as any)?.data || []);
+
+          // Sort activities strictly newest first (by createdAt and id)
+          const sortedActs = acts.slice().sort((a: any, b: any) => {
+            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            if (timeA !== timeB) return timeB - timeA;
+            return (Number(b.id) || 0) - (Number(a.id) || 0);
+          });
+
+          // 1. Prioritize finding the latest explicit re-assignment feedback note: 'Re-assigned ... with note: "..."'
+          const noteAct = sortedActs.find((a: any) => {
+            const str = String(a.action || '');
+            return /note:\s*"/i.test(str) || (str.toLowerCase().includes('re-assigned') && /note:/i.test(str));
+          });
+
+          if (noteAct && noteAct.action) {
+            const match =
+              noteAct.action.match(/note:\s*"([^"]+)"/i) ||
+              noteAct.action.match(/note:\s*([^\n]+)/i);
+            if (match && match[1]?.trim()) {
+              item.description = match[1].trim();
+              return;
+            }
+          }
+
+          // 2. Otherwise look for non-system audit re-assignment rework action
+          const reassignAct = sortedActs.find((a: any) => {
+            const actStr = String(a.action || '').toLowerCase();
+            return (actStr.includes('re-assigned') || actStr.includes('reassign')) && !actStr.startsWith('changed status');
+          });
+
+          if (reassignAct && reassignAct.action) {
+            const match =
+              reassignAct.action.match(/note:\s*"([^"]+)"/i) ||
+              reassignAct.action.match(/note:\s*([^\n]+)/i);
+            item.description = match ? match[1].trim() : reassignAct.action;
+          }
+        } catch {
+          // ignore
+        }
+      })
+    );
+  }
+
   return result;
 }
+
+export async function createTask(payload: {
+  title: string;
+  projectId: number;
+  parentTaskId?: number | null;
+  description?: string;
+  dueDate?: string;
+  estimatedTime?: string;
+  assigneeId?: string | number | null;
+}): Promise<any> {
+  const { data } = await apiClient.post('/tasks', {
+    ...payload,
+    status: 'OPEN',
+    priority: 'MEDIUM',
+    billable: true,
+    list: 'General',
+    estimatedTime: payload.estimatedTime || '00:00:00',
+  });
+  return data?.data ? data.data : data;
+}
+
+
+
 
 /** Legacy exports kept for compatibility */
 export async function fetchTasks(projectId: number, search?: string, userId?: string | number): Promise<Task[]> {
@@ -287,4 +384,16 @@ export async function fetchSubTasks(taskId: number, search?: string, userId?: st
     });
   }
   return subList;
+}
+
+export async function updateTaskStatus(taskId: number, status: string, title?: string): Promise<any> {
+  const { data } = await apiClient.put(`/tasks/${taskId}`, {
+    status,
+    ...(title ? { title } : {}),
+  });
+  return data?.data ? data.data : data;
+}
+
+export async function completeTask(task: Task | AssignedItem): Promise<any> {
+  return updateTaskStatus(task.id, 'Completed', task.title);
 }

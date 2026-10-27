@@ -30,14 +30,18 @@ export const useProjectStore = create<ProjectState>((set) => ({
   draftProject: null,
   draftTask: null,
 
-  setSelectedProject: (project) => set({ selectedProject: project, selectedTask: null }),
+  setSelectedProject: (project) =>
+    set((state) => ({
+      selectedProject: project,
+      selectedTask: state.selectedTask?.projectId === project?.id ? state.selectedTask : null,
+    })),
   setSelectedTask: (task) => set({ selectedTask: task }),
   setDraftProject: (project) => set({ draftProject: project, draftTask: null }),
   setDraftTask: (task) => set({ draftTask: task }),
   commitDraftSelection: () =>
     set((state) => ({
-      selectedProject: state.draftProject,
-      selectedTask: state.draftTask,
+      selectedProject: state.draftProject || state.selectedProject,
+      selectedTask: state.draftTask || state.selectedTask,
       draftProject: null,
       draftTask: null,
     })),

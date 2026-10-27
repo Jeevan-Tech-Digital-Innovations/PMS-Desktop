@@ -96,14 +96,21 @@ export function Profile() {
 
   return (
     <div className={styles.container}>
-      <header className={styles.header}>
-        <button className={styles.backBtn} onClick={() => navigate(-1)} disabled={isSwitchingTenant}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6"></polyline>
+      <div className={styles.header}>
+        <button 
+          className={styles.backBtn} 
+          onClick={() => navigate('/dashboard')} 
+          disabled={isSwitchingTenant}
+          title="Back to Dashboard"
+          aria-label="Back"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
           </svg>
         </button>
-        My Profile
-      </header>
+        <h2 className={styles.title}>My Profile</h2>
+      </div>
 
       <div className={styles.content}>
         {isLoading ? (

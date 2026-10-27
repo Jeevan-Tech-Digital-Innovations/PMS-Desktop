@@ -16,6 +16,8 @@ export const API_ENDPOINTS = {
   TIME_LOGS_STOP: (taskId: number) => `/tasks/${taskId}/time-logs/end`,
   TIME_LOGS_TRANSITION: (taskId: number) => `/tasks/${taskId}/time-logs/transition`,
   TIME_LOGS_ACTIVE: '/tasks/time-logs/active',
+  TIME_LOGS_ACCUMULATED_TODAY: '/tasks/time-logs/accumulated-today',
+  TASK_ACCUMULATED_TODAY: (taskId: number) => `/tasks/${taskId}/time-logs/accumulated-today`,
   TIME_LOGS: '/tasks/time-logs',
 
   // ── NOT IMPLEMENTED in PMS API ─────────────────────────────────
