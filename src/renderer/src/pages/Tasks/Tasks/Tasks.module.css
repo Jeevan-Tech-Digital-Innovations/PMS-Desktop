@@ -101,12 +101,22 @@
   align-items: center;
   gap: 10px;
   overflow: hidden;
+  min-width: 0;
+  flex: 1;
+}
+
+.projectInfoCol {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .folderIcon {
   display: flex;
   align-items: center;
   color: #64748B;
+  flex-shrink: 0;
 }
 
 .projectBoxName {
@@ -116,6 +126,18 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.25;
+}
+
+.projectBoxClient {
+  font-size: 11px;
+  font-weight: 600;
+  color: #0F766E;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  margin-top: 1px;
 }
 
 .chevronIcon {
@@ -123,6 +145,7 @@
   align-items: center;
   color: #64748B;
   margin-left: 8px;
+  flex-shrink: 0;
 }
 
 /* Search Wrapper */

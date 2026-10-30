@@ -361,7 +361,14 @@ export function Tasks() {
           <span className={styles.folderIcon}>
             <FolderIcon />
           </span>
-          <span className={styles.projectBoxName}>{activeProject?.name || 'Project'}</span>
+          <div className={styles.projectInfoCol}>
+            <span className={styles.projectBoxName}>{activeProject?.name || 'Project'}</span>
+            {(activeProject?.clientCompanyName || activeProject?.clientName) && (
+              <span className={styles.projectBoxClient} title={`Client: ${activeProject.clientCompanyName || activeProject.clientName}`}>
+                Client: {activeProject.clientCompanyName || activeProject.clientName}
+              </span>
+            )}
+          </div>
         </div>
         <span className={styles.chevronIcon}>
           <ChevronDownIcon />
