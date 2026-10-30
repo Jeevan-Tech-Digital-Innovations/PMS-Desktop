@@ -84,6 +84,21 @@ export async function getAccumulatedSecondsToday(): Promise<number> {
   }
 }
 
+export async function getAccumulatedBreakSecondsToday(): Promise<number> {
+  try {
+    const userId = useAuthStore.getState().user?.userId;
+    const url = userId
+      ? `${API_ENDPOINTS.TIME_LOGS_ACCUMULATED_BREAK_TODAY}?userId=${userId}`
+      : API_ENDPOINTS.TIME_LOGS_ACCUMULATED_BREAK_TODAY;
+    const { data } = await apiClient.get(url);
+    const val = typeof data === 'number' ? data : (data?.data ?? 0);
+    return typeof val === 'number' && !isNaN(val) ? Math.max(0, val) : 0;
+  } catch (err) {
+    console.error('Failed to get accumulated break seconds today:', err);
+    return 0;
+  }
+}
+
 export async function getTaskActualSeconds(taskId: number | string): Promise<number> {
   if (!taskId) return 0;
   try {

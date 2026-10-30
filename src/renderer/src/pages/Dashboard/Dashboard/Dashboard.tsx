@@ -11,6 +11,7 @@ import {
   stopTimeLog,
   getActiveTimeLog,
   getAccumulatedSecondsToday,
+  getAccumulatedBreakSecondsToday,
   getTaskAccumulatedSecondsToday,
   getTaskActualSeconds,
 } from '@/pages/TimeTracking/TimeTrackingApi.services';
@@ -76,6 +77,14 @@ const CheckCircleIcon = () => (
   </svg>
 );
 
+const AlertTriangleIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
+
 export function Dashboard() {
   const navigate = useNavigate();
   const {
@@ -87,12 +96,17 @@ export function Dashboard() {
     dailyTotalSeconds,
     idleSeconds,
     breakSeconds,
+    dailyBreakSeconds,
+    activeBreakLimit,
+    breakReasonText,
+    isBreakExceeded,
     isIdle,
     isOnBreak,
     pauseTask,
     stopTimer,
     setTaskSeconds,
     setDailyTotalSeconds,
+    setDailyBreakSeconds,
     stopBreak: stopBreakTimer,
   } = useTimerStore();
 
@@ -113,9 +127,10 @@ export function Dashboard() {
     let isMounted = true;
     const fetchTimes = async () => {
       try {
-        const [dailyTotal, taskTotal] = await Promise.all([
+        const [dailyTotal, taskTotal, dailyBreak] = await Promise.all([
           getAccumulatedSecondsToday().catch(() => 0),
-          selectedTask?.id ? getTaskActualSeconds(selectedTask.id).catch(() => 0) : Promise.resolve(0),
+          selectedTask?.id ? getTaskAccumulatedSecondsToday(selectedTask.id).catch(() => 0) : Promise.resolve(0),
+          getAccumulatedBreakSecondsToday().catch(() => 0),
         ]);
         if (isMounted) {
           const currentDaily = useTimerStore.getState().dailyTotalSeconds;
@@ -123,6 +138,9 @@ export function Dashboard() {
             setDailyTotalSeconds(dailyTotal);
           } else if (dailyTotal > currentDaily) {
             setDailyTotalSeconds(dailyTotal);
+          }
+          if (dailyBreak > 0) {
+            setDailyBreakSeconds(dailyBreak);
           }
           if (taskTotal !== undefined && !isTaskRunning) {
             setTaskSeconds(taskTotal);
@@ -224,7 +242,7 @@ export function Dashboard() {
       try {
         const [dailyTotal, taskTotal] = await Promise.all([
           getAccumulatedSecondsToday().catch(() => 0),
-          targetTaskId ? getTaskActualSeconds(targetTaskId).catch(() => 0) : Promise.resolve(0),
+          targetTaskId ? getTaskAccumulatedSecondsToday(targetTaskId).catch(() => 0) : Promise.resolve(0),
         ]);
         const currentDaily = useTimerStore.getState().dailyTotalSeconds;
         if (!isOverallActive) {
@@ -337,6 +355,10 @@ export function Dashboard() {
 
   const totalTimeSeconds = workSeconds + idleSeconds + breakSeconds;
 
+  const overdueSeconds =
+    activeBreakLimit && breakSeconds > activeBreakLimit ? breakSeconds - activeBreakLimit : 0;
+  const overdueMins = Math.max(1, Math.round(overdueSeconds / 60));
+
   const handleProjectCardClick = () => {
     if (isTaskRunning) return; // Don't change project while task timer is actively tracking
     if (!selectedProject) {
@@ -348,19 +370,31 @@ export function Dashboard() {
 
   return (
     <div className={styles.container}>
-      {/* Top Banner: "Timer started" alert badge matching Figma */}
+      {/* Top Banner: "Break limit exceeded" or "Timer started" alert badge matching Figma */}
       <div className={styles.bannerContainer}>
-        {isTaskRunning && showStartedBanner && (
+        {isOnBreak && isBreakExceeded ? (
+          <div className={styles.exceededBanner}>
+            <AlertTriangleIcon />
+            <span>
+              {breakReasonText || 'Break'} limit ({Math.floor((activeBreakLimit || 0) / 60)}m) exceeded!
+            </span>
+          </div>
+        ) : isTaskRunning && showStartedBanner ? (
           <div className={styles.startedBanner}>
             <CheckCircleIcon />
             <span>Timer started</span>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Status indicator: "• Tracking Task" / "• On Duty (Task Paused)" / "• Ready" */}
       <div className={styles.statusSection}>
-        {isTaskRunning ? (
+        {isOnBreak && isBreakExceeded ? (
+          <div className={styles.statusBreakExceeded}>
+            <span className={styles.exceededDot} />
+            <span>{breakReasonText || 'Break'} Exceeded (+{overdueMins}m)</span>
+          </div>
+        ) : isTaskRunning ? (
           <div className={styles.statusTracking}>
             <span className={styles.trackingDot} />
             <span>{isIdle ? 'Idle' : isOnBreak ? 'On Break' : 'Tracking'}</span>
@@ -391,9 +425,9 @@ export function Dashboard() {
             <span>{formatTime(taskSeconds)}</span>
           </div>
           <span className={styles.subTimerDivider}>|</span>
-          <div className={styles.subTimerItem} title="Break Time">
+          <div className={styles.subTimerItem} title="Total Break Time Today">
             <CoffeeIcon />
-            <span>{formatDuration(breakSeconds)}</span>
+            <span>{formatDuration(dailyBreakSeconds || breakSeconds)}</span>
           </div>
         </div>
       </div>
@@ -409,7 +443,17 @@ export function Dashboard() {
         </div>
 
         <div className={styles.cardContent}>
-          <span className={styles.cardLabel}>ACTIVE PROJECT</span>
+          <div className={styles.labelRow}>
+            <span className={styles.cardLabel}>ACTIVE PROJECT</span>
+            {(selectedProject?.clientCompanyName || selectedProject?.clientName) && (
+              <span
+                className={styles.projectClientBadge}
+                title={`Client: ${selectedProject.clientCompanyName || selectedProject.clientName}`}
+              >
+                {selectedProject.clientCompanyName || selectedProject.clientName}
+              </span>
+            )}
+          </div>
           <h3 className={styles.projectName}>
             {selectedProject?.name || 'Select Project'}
           </h3>
@@ -463,7 +507,13 @@ export function Dashboard() {
               <span>{stopMutation.isPending ? 'Pausing...' : 'Pause Task'}</span>
             </button>
             <button
-              className={`${styles.breakBtn} ${isOnBreak ? styles.breakBtnActive : ''}`}
+              className={`${styles.breakBtn} ${
+                isOnBreak
+                  ? isBreakExceeded
+                    ? styles.breakBtnExceeded
+                    : styles.breakBtnActive
+                  : ''
+              }`}
               onClick={handleBreakToggle}
             >
               <CoffeeIcon />
