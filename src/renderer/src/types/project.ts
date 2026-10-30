@@ -16,6 +16,7 @@ export interface Project {
   members: number[];
   billable: boolean;
   logoUrl: string;
+  code?: string;
 }
 
 export interface ProjectListResponse extends Array<Project> {}

@@ -7,6 +7,7 @@ import { useProjectStore } from '@/stores/projectStore';
 import {
   getActiveTimeLog,
   getAccumulatedSecondsToday,
+  getAccumulatedBreakSecondsToday,
   getTaskAccumulatedSecondsToday,
   getTaskActualSeconds,
 } from '@/pages/TimeTracking/TimeTrackingApi.services';
@@ -100,9 +101,18 @@ export function useTimerSync() {
 
     const syncTimes = async () => {
       try {
-        const [activeLog, dailyTotal] = await Promise.all([
-          getActiveTimeLog().catch(() => null),
+        let activeLog: any = null;
+        let isServerError = false;
+        try {
+          activeLog = await getActiveTimeLog();
+        } catch (err) {
+          isServerError = true;
+          console.warn('[TimerSync] Transient server/network error while verifying active log; maintaining local timer state:', err);
+        }
+
+        const [dailyTotal, dailyBreak] = await Promise.all([
           getAccumulatedSecondsToday().catch(() => 0),
+          getAccumulatedBreakSecondsToday().catch(() => 0),
         ]);
 
         if (dailyTotal > 0) {
@@ -111,6 +121,11 @@ export function useTimerSync() {
           if (!isWorkdayActive || dailyTotal > state.dailyTotalSeconds) {
             state.setDailyTotalSeconds(dailyTotal);
           }
+        }
+
+        if (dailyBreak > 0) {
+          const state = useTimerStore.getState();
+          state.setDailyBreakSeconds(dailyBreak);
         }
 
         if (activeLog && activeLog.taskId) {
@@ -129,8 +144,12 @@ export function useTimerSync() {
             } as any);
           }
 
-          const taskSec = await getTaskActualSeconds(activeLog.taskId).catch(() => 0);
-          useTimerStore.getState().setTaskSeconds(taskSec);
+          // If task is actively ticking locally, never overwrite with static/closed server totals
+          const isTaskActiveLocally = useTimerStore.getState().isTaskRunning;
+          if (!isTaskActiveLocally) {
+            const taskSec = await getTaskActualSeconds(activeLog.taskId).catch(() => 0);
+            useTimerStore.getState().setTaskSeconds(taskSec);
+          }
 
           const elapsed = activeLog.startTime
             ? Math.max(0, Math.floor((Date.now() - new Date(activeLog.startTime).getTime()) / 1000))
@@ -143,8 +162,8 @@ export function useTimerSync() {
           if (isAway && !useTimerStore.getState().isOnBreak) {
             useTimerStore.getState().startBreak();
           }
-        } else {
-          // If server reports no active task log and local grace period has elapsed:
+        } else if (!isServerError) {
+          // If server explicitly confirmed 200 OK with NO active log and grace period has elapsed:
           const isTaskActiveLocally = useTimerStore.getState().isTaskRunning;
           if (isTaskActiveLocally && Date.now() - lastLocalStartTime > 10000) {
             useTimerStore.getState().pauseTask();
