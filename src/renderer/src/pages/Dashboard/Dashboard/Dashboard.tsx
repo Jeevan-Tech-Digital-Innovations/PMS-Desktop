@@ -136,11 +136,14 @@ export function Dashboard() {
           const currentDaily = useTimerStore.getState().dailyTotalSeconds;
           if (!isOverallActive) {
             setDailyTotalSeconds(dailyTotal);
-          } else if (dailyTotal > currentDaily) {
-            setDailyTotalSeconds(dailyTotal);
-          }
-          if (dailyBreak > 0) {
             setDailyBreakSeconds(dailyBreak);
+          } else {
+            if (dailyTotal > currentDaily) {
+              setDailyTotalSeconds(dailyTotal);
+            }
+            if (dailyBreak > 0) {
+              setDailyBreakSeconds(dailyBreak);
+            }
           }
           if (taskTotal !== undefined && !isTaskRunning) {
             setTaskSeconds(taskTotal);

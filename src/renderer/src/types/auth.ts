@@ -21,6 +21,7 @@ export interface User {
   email?: string;
   empNo: string;
   roles: string[];
+  tenantId?: string;
   tenantName?: string;
   tenants?: Array<{ id: string; name: string }>;
 }
