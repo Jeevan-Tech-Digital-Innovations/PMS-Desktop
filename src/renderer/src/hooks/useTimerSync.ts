@@ -115,17 +115,18 @@ export function useTimerSync() {
           getAccumulatedBreakSecondsToday().catch(() => 0),
         ]);
 
-        if (dailyTotal > 0) {
-          const state = useTimerStore.getState();
-          const isWorkdayActive = state.isWorkdayRunning || state.isRunning;
-          if (!isWorkdayActive || dailyTotal > state.dailyTotalSeconds) {
+        const state = useTimerStore.getState();
+        const isWorkdayActive = state.isWorkdayRunning || state.isRunning;
+        if (!isWorkdayActive) {
+          state.setDailyTotalSeconds(dailyTotal);
+          state.setDailyBreakSeconds(dailyBreak);
+        } else {
+          if (dailyTotal > state.dailyTotalSeconds) {
             state.setDailyTotalSeconds(dailyTotal);
           }
-        }
-
-        if (dailyBreak > 0) {
-          const state = useTimerStore.getState();
-          state.setDailyBreakSeconds(dailyBreak);
+          if (dailyBreak > 0) {
+            state.setDailyBreakSeconds(dailyBreak);
+          }
         }
 
         if (activeLog && activeLog.taskId) {

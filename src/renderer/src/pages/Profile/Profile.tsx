@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/stores/authStore';
 import { useTimerStore } from '@/stores/timerStore';
+import { useProjectStore } from '@/stores/projectStore';
 import { fetchMyProfile, switchTenantApi } from '@/services/ProfileApi.services';
 import styles from './Profile.module.css';
 
@@ -54,6 +55,8 @@ export function Profile() {
       // Stop the timer
       useTimerStore.getState().stopTimer();
       useTimerStore.getState().reset();
+      useProjectStore.getState().clearSelection();
+      window.electronAPI?.stopTimer?.();
     }
     
     setIsSwitchingTenant(true);
@@ -63,7 +66,7 @@ export function Profile() {
       // 1. Call Axis to switch tenant
       const res = await switchTenantApi(newTenantId, accessToken);
       
-      // 2. Update local auth session with new token and roles
+      // 2. Update local auth session with new token and roles (also resets stores internally)
       updateAuthSession(res.access_token, Object.keys(res.roles), newTenantObj.name);
       
       // 3. Clear all queries so projects, tasks, etc. reload for the new tenant
