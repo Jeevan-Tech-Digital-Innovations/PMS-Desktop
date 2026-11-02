@@ -36,7 +36,7 @@ interface TimerState {
   tick: () => void;
   startIdle: (offsetSeconds: number) => void;
   stopIdle: () => void;
-  startBreak: (reasonText?: string) => void;
+  startBreak: (reasonText?: string, durationLimitMinutes?: number | null) => void;
   stopBreak: () => void;
   tickBreak: () => void;
   setOvertime: (isOvertime: boolean) => void;
@@ -302,15 +302,19 @@ export const useTimerStore = create<TimerState>((set, get) => ({
 
   stopIdle: () => set({ isIdle: false, lastTickTime: Date.now() }),
 
-  startBreak: (reasonText = '') => {
-    let limit = null;
-    const lowerReason = reasonText.toLowerCase();
-    if (lowerReason.includes('tea') || lowerReason.includes('coffee') || lowerReason.includes('snack')) {
-      limit = 15 * 60; // 15 mins for tea/coffee break
-    } else if (lowerReason.includes('lunch') || lowerReason.includes('dinner') || lowerReason.includes('meal')) {
-      limit = 30 * 60; // 30 mins for lunch/meal break
+  startBreak: (reasonText = '', durationLimitMinutes?: number | null) => {
+    let limit: number | null = null;
+    if (typeof durationLimitMinutes === 'number' && durationLimitMinutes > 0) {
+      limit = durationLimitMinutes * 60;
     } else {
-      limit = 15 * 60; // 15 mins default
+      const lowerReason = reasonText.toLowerCase();
+      if (lowerReason.includes('tea') || lowerReason.includes('coffee') || lowerReason.includes('snack')) {
+        limit = 15 * 60; // 15 mins for tea/coffee break
+      } else if (lowerReason.includes('lunch') || lowerReason.includes('dinner') || lowerReason.includes('meal')) {
+        limit = 30 * 60; // 30 mins for lunch/meal break
+      } else {
+        limit = 15 * 60; // 15 mins default
+      }
     }
     
     set({
