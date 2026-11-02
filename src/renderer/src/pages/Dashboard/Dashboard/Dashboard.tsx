@@ -13,7 +13,6 @@ import {
   getAccumulatedSecondsToday,
   getAccumulatedBreakSecondsToday,
   getTaskAccumulatedSecondsToday,
-  getTaskActualSeconds,
 } from '@/pages/TimeTracking/TimeTrackingApi.services';
 import { updateTaskStatus } from '@/pages/Tasks/TasksApi.services';
 import { stopBreak } from '@/services/BreakApi.services';
@@ -324,7 +323,7 @@ export function Dashboard() {
     try {
       const [dailyTotal, taskTotal] = await Promise.all([
         getAccumulatedSecondsToday().catch(() => 0),
-        selectedTask?.id ? getTaskActualSeconds(selectedTask.id).catch(() => 0) : Promise.resolve(0),
+        selectedTask?.id ? getTaskAccumulatedSecondsToday(selectedTask.id).catch(() => 0) : Promise.resolve(0),
       ]);
       if (dailyTotal > 0) {
         setDailyTotalSeconds(dailyTotal);

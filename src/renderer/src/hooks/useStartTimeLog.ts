@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { useTimerStore } from '@/stores/timerStore';
 import { useProjectStore } from '@/stores/projectStore';
-import { startTimeLog, getTaskAccumulatedSecondsToday, getTaskActualSeconds } from '@/pages/TimeTracking/TimeTrackingApi.services';
+import { startTimeLog, getTaskAccumulatedSecondsToday } from '@/pages/TimeTracking/TimeTrackingApi.services';
 import { markLocalTimerStart } from '@/hooks/useTimerSync';
 
 export function useStartTimeLog() {
@@ -24,7 +24,7 @@ export function useStartTimeLog() {
       startTimer(0);
 
       try {
-        const taskSec = await getTaskActualSeconds(variables.taskId).catch(() => 0);
+        const taskSec = await getTaskAccumulatedSecondsToday(variables.taskId).catch(() => 0);
         setTaskSeconds(taskSec);
       } catch {}
 
