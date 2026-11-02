@@ -565,6 +565,14 @@ app.whenReady().then(() => {
   registerIpcHandlers();
 
   // Listen for system sleep/resume and screen lock/unlock to immediately refresh heartbeat
+  powerMonitor.on('suspend', () => {
+    logger.info('[PowerMonitor] System going to sleep / lid closed, flushing heartbeat');
+    flushHeartbeat();
+  });
+  powerMonitor.on('lock-screen', () => {
+    logger.info('[PowerMonitor] Screen locked, flushing heartbeat');
+    flushHeartbeat();
+  });
   powerMonitor.on('resume', () => {
     logger.info('[PowerMonitor] System resumed from sleep, refreshing heartbeat');
     flushHeartbeat();
