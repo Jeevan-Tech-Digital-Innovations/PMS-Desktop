@@ -123,9 +123,7 @@ export function useTimerSync() {
           if (dailyTotal > state.dailyTotalSeconds) {
             state.setDailyTotalSeconds(dailyTotal);
           }
-          if (dailyBreak > 0) {
-            state.setDailyBreakSeconds(dailyBreak);
-          }
+          state.setDailyBreakSeconds(dailyBreak);
         }
 
         if (activeLog && activeLog.taskId) {
@@ -165,7 +163,8 @@ export function useTimerSync() {
         } else if (!isServerError) {
           // If server explicitly confirmed 200 OK with NO active log and grace period has elapsed:
           const isTaskActiveLocally = useTimerStore.getState().isTaskRunning;
-          if (isTaskActiveLocally && Date.now() - lastLocalStartTime > 10000) {
+          const isIdleLocally = useTimerStore.getState().isIdle;
+          if (isTaskActiveLocally && !isIdleLocally && Date.now() - lastLocalStartTime > 15000) {
             useTimerStore.getState().pauseTask();
             useProjectStore.getState().setActiveTimeLog(null);
           }

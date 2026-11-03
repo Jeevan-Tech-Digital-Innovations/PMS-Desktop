@@ -204,12 +204,10 @@ export const useTimerStore = create<TimerState>((set, get) => ({
 
   setDailyBreakSeconds: (seconds) =>
     set((state) => {
-      const isWorkdayActive = state.isWorkdayRunning || state.isRunning;
-      const stored = getDailyBreakFromLocalStorage();
-      // When on break or actively working, monotonically preserve or advance the timer
-      // When off duty (e.g. Ready state upon switching tenant), trust the server's break time directly!
-      const targetBreak = (isWorkdayActive || state.isOnBreak)
-        ? Math.max(state.dailyBreakSeconds, seconds, stored)
+      // If currently on an active break session, allow local timer to tick up smoothly.
+      // If not on break, trust the server's verified break total directly!
+      const targetBreak = state.isOnBreak
+        ? Math.max(state.dailyBreakSeconds, seconds)
         : Math.max(0, seconds);
       saveDailyBreakToLocalStorage(targetBreak);
       return { dailyBreakSeconds: targetBreak };
@@ -223,11 +221,8 @@ export const useTimerStore = create<TimerState>((set, get) => ({
         ? Math.max(state.dailyTotalSeconds, dailySeconds, stored)
         : Math.max(0, dailySeconds);
       saveDailyToLocalStorage(targetDaily);
-      const storedBreak = getDailyBreakFromLocalStorage();
-      const targetBreak = (isWorkdayActive || state.isOnBreak)
-        ? (dailyBreakSeconds !== undefined
-            ? Math.max(state.dailyBreakSeconds, dailyBreakSeconds, storedBreak)
-            : Math.max(state.dailyBreakSeconds, storedBreak))
+      const targetBreak = state.isOnBreak
+        ? Math.max(state.dailyBreakSeconds, dailyBreakSeconds ?? 0)
         : Math.max(0, dailyBreakSeconds ?? 0);
       saveDailyBreakToLocalStorage(targetBreak);
       return {
