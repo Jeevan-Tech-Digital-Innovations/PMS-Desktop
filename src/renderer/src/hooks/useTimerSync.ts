@@ -9,7 +9,6 @@ import {
   getAccumulatedSecondsToday,
   getAccumulatedBreakSecondsToday,
   getTaskAccumulatedSecondsToday,
-  getTaskActualSeconds,
 } from '@/pages/TimeTracking/TimeTrackingApi.services';
 
 // Module-level timestamp — only set when the USER explicitly clicks Start locally.
@@ -115,17 +114,18 @@ export function useTimerSync() {
           getAccumulatedBreakSecondsToday().catch(() => 0),
         ]);
 
-        if (dailyTotal > 0) {
-          const state = useTimerStore.getState();
-          const isWorkdayActive = state.isWorkdayRunning || state.isRunning;
-          if (!isWorkdayActive || dailyTotal > state.dailyTotalSeconds) {
+        const state = useTimerStore.getState();
+        const isWorkdayActive = state.isWorkdayRunning || state.isRunning;
+        if (!isWorkdayActive) {
+          state.setDailyTotalSeconds(dailyTotal);
+          state.setDailyBreakSeconds(dailyBreak);
+        } else {
+          if (dailyTotal > state.dailyTotalSeconds) {
             state.setDailyTotalSeconds(dailyTotal);
           }
-        }
-
-        if (dailyBreak > 0) {
-          const state = useTimerStore.getState();
-          state.setDailyBreakSeconds(dailyBreak);
+          if (dailyBreak > 0) {
+            state.setDailyBreakSeconds(dailyBreak);
+          }
         }
 
         if (activeLog && activeLog.taskId) {
@@ -147,7 +147,7 @@ export function useTimerSync() {
           // If task is actively ticking locally, never overwrite with static/closed server totals
           const isTaskActiveLocally = useTimerStore.getState().isTaskRunning;
           if (!isTaskActiveLocally) {
-            const taskSec = await getTaskActualSeconds(activeLog.taskId).catch(() => 0);
+            const taskSec = await getTaskAccumulatedSecondsToday(activeLog.taskId).catch(() => 0);
             useTimerStore.getState().setTaskSeconds(taskSec);
           }
 
@@ -172,7 +172,7 @@ export function useTimerSync() {
 
           const selTask = useProjectStore.getState().selectedTask;
           if (selTask?.id && !useTimerStore.getState().isTaskRunning) {
-            const taskSec = await getTaskActualSeconds(selTask.id).catch(() => 0);
+            const taskSec = await getTaskAccumulatedSecondsToday(selTask.id).catch(() => 0);
             useTimerStore.getState().setTaskSeconds(taskSec);
           }
         }

@@ -36,16 +36,26 @@ interface TimerState {
   tick: () => void;
   startIdle: (offsetSeconds: number) => void;
   stopIdle: () => void;
-  startBreak: (reasonText?: string) => void;
+  startBreak: (reasonText?: string, durationLimitMinutes?: number | null) => void;
   stopBreak: () => void;
   tickBreak: () => void;
   setOvertime: (isOvertime: boolean) => void;
   reset: () => void;
 }
 
+const getTenantUserPrefix = () => {
+  try {
+    const tenantId = localStorage.getItem('pms_active_tenant_id') || 'default';
+    const userId = localStorage.getItem('pms_active_user_id') || 'unknown';
+    return `${tenantId}_${userId}`;
+  } catch {
+    return 'default';
+  }
+};
+
 const getTodayKey = () => {
   const d = new Date();
-  return `pms_daily_workday_${d.getFullYear()}_${d.getMonth() + 1}_${d.getDate()}`;
+  return `pms_daily_workday_${getTenantUserPrefix()}_${d.getFullYear()}_${d.getMonth() + 1}_${d.getDate()}`;
 };
 
 const saveDailyToLocalStorage = (sec: number) => {
@@ -65,7 +75,7 @@ const getDailyFromLocalStorage = (): number => {
 
 const getTodayBreakKey = () => {
   const d = new Date();
-  return `pms_daily_break_${d.getFullYear()}_${d.getMonth() + 1}_${d.getDate()}`;
+  return `pms_daily_break_${getTenantUserPrefix()}_${d.getFullYear()}_${d.getMonth() + 1}_${d.getDate()}`;
 };
 
 const saveDailyBreakToLocalStorage = (sec: number) => {
@@ -194,23 +204,31 @@ export const useTimerStore = create<TimerState>((set, get) => ({
 
   setDailyBreakSeconds: (seconds) =>
     set((state) => {
+      const isWorkdayActive = state.isWorkdayRunning || state.isRunning;
       const stored = getDailyBreakFromLocalStorage();
-      const targetBreak = state.isOnBreak
-        ? Math.max(state.dailyBreakSeconds, seconds)
-        : Math.max(state.dailyBreakSeconds, seconds, stored);
+      // When on break or actively working, monotonically preserve or advance the timer
+      // When off duty (e.g. Ready state upon switching tenant), trust the server's break time directly!
+      const targetBreak = (isWorkdayActive || state.isOnBreak)
+        ? Math.max(state.dailyBreakSeconds, seconds, stored)
+        : Math.max(0, seconds);
       saveDailyBreakToLocalStorage(targetBreak);
       return { dailyBreakSeconds: targetBreak };
     }),
 
   initDailyTime: (dailySeconds, taskSeconds, dailyBreakSeconds) =>
     set((state) => {
+      const isWorkdayActive = state.isWorkdayRunning || state.isRunning;
       const stored = getDailyFromLocalStorage();
-      const targetDaily = Math.max(state.dailyTotalSeconds, dailySeconds, stored);
+      const targetDaily = isWorkdayActive
+        ? Math.max(state.dailyTotalSeconds, dailySeconds, stored)
+        : Math.max(0, dailySeconds);
       saveDailyToLocalStorage(targetDaily);
       const storedBreak = getDailyBreakFromLocalStorage();
-      const targetBreak = dailyBreakSeconds !== undefined
-        ? Math.max(state.dailyBreakSeconds, dailyBreakSeconds, storedBreak)
-        : Math.max(state.dailyBreakSeconds, storedBreak);
+      const targetBreak = (isWorkdayActive || state.isOnBreak)
+        ? (dailyBreakSeconds !== undefined
+            ? Math.max(state.dailyBreakSeconds, dailyBreakSeconds, storedBreak)
+            : Math.max(state.dailyBreakSeconds, storedBreak))
+        : Math.max(0, dailyBreakSeconds ?? 0);
       saveDailyBreakToLocalStorage(targetBreak);
       return {
         dailyTotalSeconds: targetDaily,
@@ -284,15 +302,19 @@ export const useTimerStore = create<TimerState>((set, get) => ({
 
   stopIdle: () => set({ isIdle: false, lastTickTime: Date.now() }),
 
-  startBreak: (reasonText = '') => {
-    let limit = null;
-    const lowerReason = reasonText.toLowerCase();
-    if (lowerReason.includes('tea') || lowerReason.includes('coffee') || lowerReason.includes('snack')) {
-      limit = 15 * 60; // 15 mins for tea/coffee break
-    } else if (lowerReason.includes('lunch') || lowerReason.includes('dinner') || lowerReason.includes('meal')) {
-      limit = 30 * 60; // 30 mins for lunch/meal break
+  startBreak: (reasonText = '', durationLimitMinutes?: number | null) => {
+    let limit: number | null = null;
+    if (typeof durationLimitMinutes === 'number' && durationLimitMinutes > 0) {
+      limit = durationLimitMinutes * 60;
     } else {
-      limit = 15 * 60; // 15 mins default
+      const lowerReason = reasonText.toLowerCase();
+      if (lowerReason.includes('tea') || lowerReason.includes('coffee') || lowerReason.includes('snack')) {
+        limit = 15 * 60; // 15 mins for tea/coffee break
+      } else if (lowerReason.includes('lunch') || lowerReason.includes('dinner') || lowerReason.includes('meal')) {
+        limit = 30 * 60; // 30 mins for lunch/meal break
+      } else {
+        limit = 15 * 60; // 15 mins default
+      }
     }
     
     set({
