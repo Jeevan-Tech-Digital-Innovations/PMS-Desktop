@@ -3,6 +3,7 @@ import { apiClient } from './apiClient';
 export interface BreakReason {
   id: string;
   reasonText: string;
+  durationLimitMinutes?: number | null;
 }
 
 export const getBreakReasons = async () => {

@@ -46,14 +46,14 @@ export function BreakModal() {
     try {
       setIsStarting(true);
       await startBreak(activeTimeLog.id, reasonId);
-      startBreakTimer(selectedReason?.reasonText);
+      startBreakTimer(selectedReason?.reasonText, selectedReason?.durationLimitMinutes);
       window.electronAPI?.startBreak();
       toast.success('Break started');
       closeBreakModal();
     } catch (error: any) {
       const errMsg = error.response?.data?.message || '';
       if (errMsg.toLowerCase().includes('already exists')) {
-        startBreakTimer(selectedReason?.reasonText);
+        startBreakTimer(selectedReason?.reasonText, selectedReason?.durationLimitMinutes);
         window.electronAPI?.startBreak();
         toast.success('Break started');
         closeBreakModal();
@@ -100,8 +100,14 @@ export function BreakModal() {
                   className={styles.reasonBtn}
                   onClick={() => handleSelectReason(r.id)}
                   disabled={isStarting}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                 >
-                  {r.reasonText}
+                  <span>{r.reasonText}</span>
+                  {r.durationLimitMinutes ? (
+                    <span style={{ fontSize: '12px', opacity: 0.75, fontWeight: 500, backgroundColor: 'rgba(255,255,255,0.12)', padding: '2px 8px', borderRadius: '10px' }}>
+                      {r.durationLimitMinutes}m
+                    </span>
+                  ) : null}
                 </button>
               ))
             ) : (
