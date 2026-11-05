@@ -140,9 +140,7 @@ export function Dashboard() {
             if (dailyTotal > currentDaily) {
               setDailyTotalSeconds(dailyTotal);
             }
-            if (dailyBreak > 0) {
-              setDailyBreakSeconds(dailyBreak);
-            }
+            setDailyBreakSeconds(dailyBreak);
           }
           if (taskTotal !== undefined && !isTaskRunning) {
             setTaskSeconds(taskTotal);

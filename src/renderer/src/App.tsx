@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
-import { useEffect } from 'react';
+import toast, { Toaster } from 'react-hot-toast';
+import { useEffect, useRef } from 'react';
+import { markLocalTimerStart } from '@/hooks/useTimerSync';
 import { useAuthStore } from '@/stores/authStore';
 import { useTimerStore } from '@/stores/timerStore';
 import { useProjectStore } from '@/stores/projectStore';
@@ -108,11 +109,14 @@ export default function App() {
     return () => unsubscribe?.();
   }, []);
 
+  const wasTaskRunningBeforeIdleRef = useRef(false);
+
   useEffect(() => {
     // Idle state changes from the main process activity monitor
     if (typeof window.electronAPI?.onIdleStarted !== 'function') return;
     const unsubscribeStart = window.electronAPI.onIdleStarted(async (data) => {
-      console.log('[Idle] Started');
+      console.log('[Idle] Started after', data.seconds, 'seconds');
+      wasTaskRunningBeforeIdleRef.current = useTimerStore.getState().isTaskRunning;
       useTimerStore.getState().startIdle(data.seconds);
 
       // Check user setting for idle notes
@@ -130,35 +134,73 @@ export default function App() {
       }
 
       // Sync IDLE state to API
-      if (useTimerStore.getState().isRunning) {
+      const isWorkdayActive = useTimerStore.getState().isRunning || useTimerStore.getState().isWorkdayRunning;
+      if (isWorkdayActive) {
         const taskId = useProjectStore.getState().activeTimeLog?.taskId || (useProjectStore.getState().selectedTask as any)?.id;
         if (taskId) {
           try {
             const { transitionTimerState } = await import('@/pages/TimeTracking/TimeTrackingApi.services');
-            await transitionTimerState(Number(taskId), 'IDLE');
+            const idleLog = await transitionTimerState(Number(taskId), 'IDLE');
+            if (idleLog?.id) {
+              useProjectStore.getState().setActiveTimeLog(idleLog);
+              window.electronAPI?.startTimer({
+                timeLogId: idleLog.id,
+                startTime: idleLog.startTime || new Date().toISOString(),
+              });
+            }
           } catch (e) {
             console.error('[Idle] Failed to transition to IDLE', e);
           }
         }
       }
     });
+
     const unsubscribeStop = window.electronAPI.onIdleStopped(async () => {
-      console.log('[Idle] Stopped');
+      console.log('[Idle] Stopped – activity detected');
+      const shouldResumeTask = wasTaskRunningBeforeIdleRef.current;
       useTimerStore.getState().stopIdle();
 
-      // Sync active state back to API
-      if (useTimerStore.getState().isRunning) {
+      const isWorkdayActive = useTimerStore.getState().isRunning || useTimerStore.getState().isWorkdayRunning;
+      if (isWorkdayActive && shouldResumeTask) {
+        console.log('[Idle] Auto-resuming task tracking due to user activity');
+        // 1. Immediately resume task in local store
+        useTimerStore.getState().resumeTask();
+        markLocalTimerStart();
+
+        // 2. Automatically sync active state back to API, start heartbeat and update UI
         const taskId = useProjectStore.getState().activeTimeLog?.taskId || (useProjectStore.getState().selectedTask as any)?.id;
         if (taskId) {
           try {
-            const { transitionTimerState } = await import('@/pages/TimeTracking/TimeTrackingApi.services');
-            await transitionTimerState(Number(taskId), 'ACTIVE_PRODUCTIVE');
+            const { transitionTimerState, startTimeLog, getTaskAccumulatedSecondsToday } = await import('@/pages/TimeTracking/TimeTrackingApi.services');
+            let activeLog = null;
+            try {
+              activeLog = await transitionTimerState(Number(taskId), 'ACTIVE_PRODUCTIVE');
+            } catch (err) {
+              console.warn('[Idle] transition to ACTIVE_PRODUCTIVE failed; starting fresh time log:', err);
+              activeLog = await startTimeLog(Number(taskId)).catch(() => null);
+            }
+
+            if (activeLog?.id) {
+              useProjectStore.getState().setActiveTimeLog(activeLog);
+              window.electronAPI?.startTimer({
+                timeLogId: activeLog.id,
+                startTime: activeLog.startTime || new Date().toISOString(),
+              });
+            }
+
+            try {
+              const taskSec = await getTaskAccumulatedSecondsToday(Number(taskId)).catch(() => 0);
+              useTimerStore.getState().setTaskSeconds(taskSec);
+            } catch {}
+
+            toast.success('Activity detected — task tracking auto-resumed!', { id: 'idle-resume', duration: 3000 });
           } catch (e) {
             console.error('[Idle] Failed to transition to ACTIVE_PRODUCTIVE', e);
           }
         }
       }
     });
+
     return () => {
       unsubscribeStart?.();
       unsubscribeStop?.();
