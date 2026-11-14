@@ -71,7 +71,7 @@ The app shows a one-time notice when it runs on Wayland. What still works on Way
 | Screenshots | Yes | Through the screenshot service; may ask for permission or fail |
 
 **For IT:** the `.deb` depends on WebKitGTK 4.1, GTK 3 and `libayatana-appindicator3-1`, which `apt` installs. Ubuntu's
-standard desktop already includes the other libraries it uses (D-Bus, PipeWire, OpenSSL, libxcb, Mesa GBM/EGL).
+standard desktop already includes the other libraries it uses (D-Bus, OpenSSL, libxcb).
 
 ## Moving from the old app
 

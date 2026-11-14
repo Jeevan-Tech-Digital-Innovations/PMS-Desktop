@@ -18,7 +18,7 @@ Requirements:
 - **Rust** (stable)
 - **Windows:** Microsoft C++ Build Tools (the "Desktop development with C++" workload). WebView2 is included in Windows 11.
 - **Ubuntu:** the system packages in [`.github/scripts/install-linux-deps.sh`](.github/scripts/install-linux-deps.sh)
-  (WebKitGTK 4.1, AppIndicator, D-Bus, PipeWire, clang and a few X11/Wayland headers). Run the script once.
+  (WebKitGTK 4.1, AppIndicator, D-Bus and libxcb). Run the script once.
 - **macOS (development only):** Xcode Command Line Tools (`xcode-select --install`)
 
 Install Rust:

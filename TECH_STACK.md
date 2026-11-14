@@ -27,7 +27,7 @@ count time or hold credentials.
 | Platforms | Windows 10/11 and Ubuntu 22.04+ (macOS code still compiles; not shipped) |
 | Secure storage | OS keychain via the `keyring` crate (refresh token and device id): Windows Credential Manager, Linux Secret Service (`sync-secret-service` + `crypto-rust`; in-memory only if unavailable) |
 | Linux desktop queries | `dbus` (GNOME Mutter idle time, GNOME ScreenSaver / logind lock state) and `x11rb` (X11 XScreenSaver idle time) |
-| Screenshots / active window | `xcap` (X11, Wayland portal, Windows) and `active-win-pos-rs` |
+| Screenshots / active window | `xcap` on Windows, X11 `GetImage` via `x11rb` on Ubuntu; `active-win-pos-rs` |
 | Packaging | Windows NSIS installer (per-user, WebView2 bootstrapper); Ubuntu `.deb` and `.AppImage` |
 | Channels | Staging and production: `tauri.staging.conf.json` overlay (product name, identifier, binary name) plus compiled-in URLs |
 

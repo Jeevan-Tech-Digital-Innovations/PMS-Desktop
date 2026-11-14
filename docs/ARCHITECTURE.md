@@ -192,7 +192,7 @@ Platform sources:
 |---|---|---|---|
 | Idle time | `GetLastInputInfo` | XScreenSaver extension (`x11rb`), else GNOME Mutter | GNOME Mutter `org.gnome.Mutter.IdleMonitor.GetIdletime` (D-Bus) |
 | Active window | `active-win-pos-rs` | `active-win-pos-rs` (EWMH `_NET_ACTIVE_WINDOW`, `/proc/<pid>/exe`) | X11 (XWayland) windows only; otherwise app `"Unknown"`, empty title |
-| Screenshots | `xcap` (GDI) | `xcap` (X11) | `xcap` via the desktop screenshot portal; may prompt or fail. A failure is logged once per run |
+| Screenshots | `xcap` (GDI) | X11 root window via `x11rb` (all monitors) | Not available (no X11 root); a failure is logged once per run |
 | Tray | Click toggles the window | AppIndicator: click opens the menu; menu item **Open PMS Desktop** | same |
 
 - Screenshots: every `screenshotTimer` minutes (default 10), at a random moment inside each interval; all monitors stitched

@@ -8,10 +8,8 @@ packages=(
   libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev
   # D-Bus: tao, keyring (Secret Service), idle time and screen lock
   libdbus-1-dev
-  # xcap screenshots: X11 (xcb + RandR), Wayland portal (PipeWire, bindgen needs clang), wlroots (GBM/EGL)
-  libxcb1-dev libxcb-randr0-dev
-  libpipewire-0.3-dev libspa-0.2-dev clang libclang-dev
-  libwayland-dev libgbm-dev libegl-dev
+  # Active window (active-win-pos-rs uses libxcb). Screenshots and idle use pure-Rust x11rb: no PipeWire needed.
+  libxcb1-dev
 )
 
 sudo apt-get update
