@@ -36,3 +36,7 @@ yarn-debug.log*
 # Temp screenshots (should never be committed)
 tmp/
 screenshots/
+
+# Tauri
+src-tauri/target/
+src-tauri/gen/schemas/

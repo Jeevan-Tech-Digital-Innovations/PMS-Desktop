@@ -1,0 +1,25 @@
+.chosen {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.chosenTitle {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chosenPath {
+  overflow: hidden;
+  color: var(--c-text-3);
+  font-size: var(--fs-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hint {
+  color: var(--c-text-3);
+  font-size: var(--fs-md);
+}

@@ -1,0 +1,160 @@
+name: Desktop build
+
+# Channels (docs/INSTALL.md "Staging vs production builds"):
+# - pull_request:        checks + staging installers as artifacts, no release
+# - push to build/staging: staging release (prerelease, tag desktop-staging-v<version>-<run>)
+# - push to main:        production release (tag desktop-v<version>)
+# - workflow_dispatch:   installers for the chosen channel as artifacts, no release
+on:
+  pull_request:
+  push:
+    branches:
+      - build/staging
+      - main
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Channel (server URLs, app name and identifier)
+        type: choice
+        options:
+          - staging
+          - production
+        default: staging
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    name: Checks (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Frontend tests
+        run: npm test
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Rust clippy
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+  checks-linux:
+    name: Checks (Ubuntu)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system packages
+        run: .github/scripts/install-linux-deps.sh
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Rust clippy
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+  # Read-only end-to-end check against staging (src-tauri/src/selftest.rs): sign-in, company, settings,
+  # projects, tasks, active timer, totals, break reasons, a screenshot to a temp file, sign-out. It starts no
+  # timer and uploads nothing. Skipped (with a notice) when the test account secrets are not set.
+  selftest-windows:
+    name: Self-test (Windows, staging)
+    needs: checks
+    runs-on: windows-latest
+    env:
+      PMS_API_URL: https://stagingpmsapi.enjev.com/api/v1
+      AXIS_API_URL: https://stagingaxisapi.enjev.com
+      PMS_WEB_URL: https://stagingpms.enjev.com
+      PMS_SELFTEST_HEADLESS: "1"
+    steps:
+      - name: Check for the staging test account
+        id: account
+        shell: bash
+        env:
+          EMAIL: ${{ secrets.PMS_STAGING_TEST_EMAIL }}
+          PASSWORD: ${{ secrets.PMS_STAGING_TEST_PASSWORD }}
+        run: |
+          if [ -n "$EMAIL" ] && [ -n "$PASSWORD" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Self-test skipped::Set the PMS_STAGING_TEST_EMAIL and PMS_STAGING_TEST_PASSWORD repository secrets to run the staging self-test."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.account.outputs.present == 'true'
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.account.outputs.present == 'true'
+
+      - uses: swatinem/rust-cache@v2
+        if: steps.account.outputs.present == 'true'
+        with:
+          workspaces: src-tauri
+
+      - name: Build debug binary
+        if: steps.account.outputs.present == 'true'
+        run: cargo build --manifest-path src-tauri/Cargo.toml
+
+      - name: Self-test against staging
+        if: steps.account.outputs.present == 'true'
+        env:
+          PMS_DEV_EMAIL: ${{ secrets.PMS_STAGING_TEST_EMAIL }}
+          PMS_DEV_PASSWORD: ${{ secrets.PMS_STAGING_TEST_PASSWORD }}
+        run: cargo run --manifest-path src-tauri/Cargo.toml -- --selftest
+
+  # Pull requests and manual runs: installers as artifacts only (read-only token).
+  build:
+    name: Build
+    if: github.event_name != 'push'
+    needs: [checks, checks-linux]
+    uses: ./.github/workflows/desktop-bundle.yml
+    with:
+      channel: ${{ inputs.channel || 'staging' }}
+      release: false
+    secrets: inherit
+
+  # Pushes to build/staging and main: installers published as a GitHub Release.
+  release:
+    name: Release
+    if: github.event_name == 'push'
+    needs: [checks, checks-linux]
+    permissions:
+      contents: write
+    uses: ./.github/workflows/desktop-bundle.yml
+    with:
+      channel: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+      release: true
+    secrets: inherit
