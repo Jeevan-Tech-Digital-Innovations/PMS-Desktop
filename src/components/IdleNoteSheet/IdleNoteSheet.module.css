@@ -1,0 +1,27 @@
+.text {
+  margin: 0 0 var(--sp-3);
+  color: var(--c-text-2);
+}
+
+.label {
+  display: block;
+  margin-bottom: var(--sp-1);
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.textarea {
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+  color: var(--c-text);
+  resize: none;
+}
+
+.textarea:focus {
+  border-color: var(--c-accent);
+  box-shadow: var(--shadow-focus);
+  outline: none;
+}

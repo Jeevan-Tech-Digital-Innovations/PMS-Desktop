@@ -1,51 +1,45 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { IdleNoteSheet } from "./components/IdleNoteSheet/IdleNoteSheet";
+import { OvertimeDialog } from "./components/OvertimeDialog/OvertimeDialog";
+import { Spinner } from "./components/Spinner/Spinner";
+import { Toasts } from "./components/Toasts/Toasts";
+import { useAppState } from "./state/StoreProvider";
+import { NoticeView } from "./views/NoticeView";
+import { PickerView } from "./views/PickerView";
+import { SignInView } from "./views/SignInView";
+import { TimerView } from "./views/TimerView";
+import styles from "./views/views.module.css";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+function Screen() {
+  const booted = useAppState((s) => s.booted);
+  const session = useAppState((s) => s.session);
+  const stopped = useAppState((s) => s.timer.state === "stopped");
+  const pickerOpen = useAppState((s) => s.pickerOpen);
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
-
-  return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+  if (!booted) {
+    return (
+      <div className={styles.splash}>
+        <Spinner label="Starting" />
       </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
-  );
+    );
+  }
+  if (!session) return <SignInView />;
+  if (!session.firstRunNoticeAccepted) return <NoticeView />;
+  if (stopped || pickerOpen) return <PickerView session={session} />;
+  return <TimerView session={session} />;
 }
 
-export default App;
+export default function App() {
+  const signedIn = useAppState((s) => s.session?.firstRunNoticeAccepted === true);
+  return (
+    <>
+      <Screen />
+      {signedIn && (
+        <>
+          <IdleNoteSheet />
+          <OvertimeDialog />
+        </>
+      )}
+      <Toasts />
+    </>
+  );
+}
