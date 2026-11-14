@@ -134,6 +134,8 @@ export type MockOptions = {
   latencyMs?: number;
   /** Tick the timer every second like the Rust side does. Default false (tests call `tick()`). */
   autoTick?: boolean;
+  /** `app_info.linuxSession`. Default null (Windows). */
+  linuxSession?: AppInfo["linuxSession"];
 };
 
 const IDLE_TIMER: TimerSnapshot = {
@@ -159,13 +161,17 @@ export class MockBackend implements Backend {
   private recents: TaskRef[] = flatten()
     .filter((t) => [103, 2011, 301].includes(t.taskId))
     .reverse();
-  private opts: Required<Pick<MockOptions, "latencyMs" | "trackingMode">>;
+  private opts: Required<Pick<MockOptions, "latencyMs" | "trackingMode" | "linuxSession">>;
   private noticeAccepted: boolean;
   /** Notes submitted through `submit_idle_note` (inspectable in tests). */
   readonly idleNotes: string[] = [];
 
   constructor(options: MockOptions = {}) {
-    this.opts = { latencyMs: options.latencyMs ?? 0, trackingMode: options.trackingMode ?? "visible" };
+    this.opts = {
+      latencyMs: options.latencyMs ?? 0,
+      trackingMode: options.trackingMode ?? "visible",
+      linuxSession: options.linuxSession ?? null,
+    };
     this.noticeAccepted = options.noticeAccepted ?? options.signedIn === true;
     this.session = options.signedIn ? this.makeSession("anita.rao@acme.com") : null;
     if (options.autoTick) this.interval = setInterval(() => this.tick(), 1000);
@@ -425,12 +431,18 @@ export class MockBackend implements Backend {
         }
         return undefined;
       case "app_info":
-        return { version: "2.0.0", platform: "windows", apiUrl: "mock://pms", dev: true } satisfies AppInfo;
+        return {
+          version: "2.0.0",
+          platform: this.opts.linuxSession ? "linux" : "windows",
+          apiUrl: "mock://pms",
+          dev: true,
+          linuxSession: this.opts.linuxSession,
+        } satisfies AppInfo;
     }
   }
 }
 
-/** Mock configured from the URL, for `npm run dev` in a browser. ?signedin=1 &silent=1 &notice=1 */
+/** Mock configured from the URL, for `npm run dev` in a browser. ?signedin=1 &silent=1 &notice=1 &wayland=1 */
 export function createBrowserMock(search: string): MockBackend {
   const q = new URLSearchParams(search);
   const signedIn = q.has("signedin");
@@ -438,6 +450,7 @@ export function createBrowserMock(search: string): MockBackend {
     signedIn,
     noticeAccepted: signedIn && !q.has("notice"),
     trackingMode: q.has("silent") ? "silent" : "visible",
+    linuxSession: q.has("wayland") ? "wayland" : null,
     latencyMs: 150,
     autoTick: true,
   });

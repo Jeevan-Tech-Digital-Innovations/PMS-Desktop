@@ -1,0 +1,37 @@
+.banner {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3) var(--sp-2) var(--sp-4);
+  background: var(--c-info-soft);
+  color: var(--c-info-dark);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+
+.icon {
+  display: inline-flex;
+  flex: none;
+  margin-top: 1px;
+}
+
+.msg {
+  flex: 1;
+  min-width: 0;
+}
+
+.close {
+  display: inline-flex;
+  flex: none;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: inherit;
+  opacity: 0.75;
+}
+
+.close:hover {
+  opacity: 1;
+}

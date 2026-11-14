@@ -30,7 +30,14 @@ export type TimerSnapshot = {
   queued: number;
   online: boolean;
 };
-export type AppInfo = { version: string; platform: "windows" | "macos"; apiUrl: string; dev: boolean };
+export type AppInfo = {
+  version: string;
+  platform: "windows" | "linux" | "macos";
+  apiUrl: string;
+  dev: boolean;
+  /** Linux desktop session; `null` on Windows (and macOS) or when unknown. */
+  linuxSession: "x11" | "wayland" | null;
+};
 
 export type IdleNoteMode = "off" | "optional" | "mandatory";
 export type ToastKind = "info" | "success" | "warning" | "error";
