@@ -24,6 +24,8 @@ pub struct Config {
     /// Debug builds only. Never logged.
     pub dev_password: Option<String>,
     pub fast: bool,
+    /// Debug builds only (`PMS_DEV_SHOW_WINDOW=1`): show the window at start-up even when signed in.
+    pub dev_show_window: bool,
     pub dev: bool,
     pub data_dir: PathBuf,
     pub timings: Timings,
@@ -112,6 +114,7 @@ impl Config {
             dev_email: dev_var("PMS_DEV_EMAIL"),
             dev_password: dev_var("PMS_DEV_PASSWORD"),
             fast,
+            dev_show_window: dev_var("PMS_DEV_SHOW_WINDOW").is_some_and(|v| v == "1" || v.eq_ignore_ascii_case("true")),
             dev,
             data_dir: data_dir(),
             timings: if fast { Timings::fast() } else { Timings::normal() },

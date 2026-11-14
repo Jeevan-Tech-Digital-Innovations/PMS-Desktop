@@ -9,6 +9,8 @@ pub mod config;
 pub mod error;
 pub mod queue;
 #[cfg(debug_assertions)]
+pub mod e2e;
+#[cfg(debug_assertions)]
 pub mod selftest;
 pub mod settings;
 pub mod time;
@@ -83,8 +85,9 @@ pub fn run() {
                 let signed_in = core.startup().await;
                 tray::refresh(&handle, &core);
                 core.emit_timer();
-                // Visible mode opens the window at start-up only when signed out.
-                if !signed_in {
+                // Visible mode opens the window at start-up only when signed out
+                // (debug builds: `PMS_DEV_SHOW_WINDOW=1` always opens it).
+                if !signed_in || (cfg!(debug_assertions) && core.cfg.dev_show_window) {
                     tray::show_window(&handle);
                 }
             });

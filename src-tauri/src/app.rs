@@ -580,7 +580,7 @@ impl Core {
 
     // ── Idle ────────────────────────────────────────────────────────────────
 
-    async fn go_idle(&self, idle_secs: u64) {
+    pub(crate) async fn go_idle(&self, idle_secs: u64) {
         let _g = self.op.lock().await;
         let task_id = {
             let m = lock(&self.timer);
@@ -650,7 +650,7 @@ impl Core {
         Ok(())
     }
 
-    async fn auto_resume(&self) {
+    pub(crate) async fn auto_resume(&self) {
         let _g = self.op.lock().await;
         if self.timer_state() != TimerState::Idle {
             return;
@@ -731,16 +731,18 @@ impl Core {
         }
     }
 
-    async fn capture_screenshot(&self) {
+    /// Capture one screenshot for the current log, honouring blur and app/URL masking.
+    /// `Ok(None)` when not working. Returns the queue job, the JPEG and whether to notify.
+    pub(crate) async fn capture_job(&self) -> Result<Option<(Job, Vec<u8>, bool)>, String> {
         let settings = self.settings.get(&self.api).await;
         let log_id = {
             let m = lock(&self.timer);
             if m.state != TimerState::Working {
-                return;
+                return Ok(None);
             }
             m.log.as_ref().map(|l| l.id)
         };
-        let Some(log_id) = log_id else { return };
+        let Some(log_id) = log_id else { return Ok(None) };
         let activity = {
             let mut t = lock(&self.track);
             let p = t.sampler.percent();
@@ -750,33 +752,67 @@ impl Core {
         let title = self.window_title_for_upload(settings.track_apps);
         let captured_at = crate::time::api_now();
         let blur = settings.blur;
-        let res = tokio::task::spawn_blocking(move || screenshot::capture_jpeg(blur)).await;
-        match res {
-            Ok(Ok(jpeg)) => {
-                let job = Job::Screenshot { time_log_id: log_id, captured_at, activity_percent: activity, active_window_title: title };
+        let jpeg = tokio::task::spawn_blocking(move || screenshot::capture_jpeg(blur)).await.map_err(|e| e.to_string())??;
+        let job = Job::Screenshot { time_log_id: log_id, captured_at, activity_percent: activity, active_window_title: title };
+        Ok(Some((job, jpeg, settings.screenshot_notifications)))
+    }
+
+    async fn capture_screenshot(&self) {
+        match self.capture_job().await {
+            Ok(Some((job, jpeg, notify))) => {
                 if let Err(e) = self.queue.enqueue(job, Some(&jpeg)) {
                     log::warn!("queue screenshot: {e}");
-                } else if settings.screenshot_notifications {
+                } else if notify {
                     self.ui.notify("Screenshot captured", "PMS Desktop captured your screen for your timesheet.");
                 }
             }
-            Ok(Err(e)) => log::warn!("screenshot capture failed: {e}"),
-            Err(e) => log::warn!("screenshot task failed: {e}"),
+            Ok(None) => {}
+            Err(e) => log::warn!("screenshot capture failed: {e}"),
         }
+    }
+
+    /// Read the foreground window into the app-usage tracker now (normally every 5 s from the tick).
+    pub(crate) async fn observe_window(&self) -> Option<WindowInfo> {
+        let w = tokio::task::spawn_blocking(apps::active_window).await.ok().flatten();
+        let mut tr = lock(&self.track);
+        tr.usage.observe(w.clone(), Local::now());
+        if w.is_some() {
+            tr.last_window = w.clone();
+        }
+        w
+    }
+
+    /// Close the current app-usage sessions (keeping the window tracked) and build the bulk payload.
+    pub(crate) fn drain_usage_payload(&self) -> Option<(serde_json::Value, usize)> {
+        let (records, log_id) = {
+            let mut tr = lock(&self.track);
+            (tr.usage.drain(Local::now()), tr.usage_log_id)
+        };
+        let mode = self.settings.peek().map(|s| s.track_apps).unwrap_or(TrackApps::Both);
+        apps::usage_payload(&records, log_id?, mode).map(|v| (v, records.len()))
     }
 
     // ── Server sync ─────────────────────────────────────────────────────────
 
     async fn heartbeat(&self) {
+        let _ = self.heartbeat_once().await;
+    }
+
+    /// One heartbeat for the open log. `Ok(false)` when no log is open.
+    pub(crate) async fn heartbeat_once(&self) -> AppResult<bool> {
         let id = lock(&self.timer).log.as_ref().map(|l| l.id);
-        let Some(id) = id else { return };
+        let Some(id) = id else { return Ok(false) };
         match self.api.heartbeat(id).await {
-            Ok(()) => {}
-            Err(e) if e.code == ErrorCode::Validation => {
-                log::info!("heartbeat rejected ({e}); re-checking the active timer");
-                self.poll_now.notify_one();
+            Ok(()) => Ok(true),
+            Err(e) => {
+                if e.code == ErrorCode::Validation {
+                    log::info!("heartbeat rejected ({e}); re-checking the active timer");
+                    self.poll_now.notify_one();
+                } else {
+                    log::debug!("heartbeat failed: {e}");
+                }
+                Err(e)
             }
-            Err(e) => log::debug!("heartbeat failed: {e}"),
         }
     }
 
@@ -1064,21 +1100,16 @@ impl Core {
                 last_app_poll = now;
                 let c = self.clone();
                 tokio::spawn(async move {
-                    let w = tokio::task::spawn_blocking(apps::active_window).await.ok().flatten();
-                    let mut tr = lock(&c.track);
-                    tr.usage.observe(w.clone(), Local::now());
-                    if w.is_some() {
-                        tr.last_window = w;
-                    }
+                    c.observe_window().await;
                 });
             }
             if now.duration_since(last_flush) >= t.app_flush {
                 last_flush = now;
-                let (records, log_id) = {
-                    let mut tr = lock(&self.track);
-                    (tr.usage.drain(Local::now()), tr.usage_log_id)
-                };
-                self.enqueue_usage(records, log_id);
+                if let Some((items, _)) = self.drain_usage_payload()
+                    && let Err(e) = self.queue.enqueue(Job::AppUsage { items }, None)
+                {
+                    log::warn!("queue app usage: {e}");
+                }
             }
             let due = lock(&self.track).schedule.as_mut().is_some_and(|s| s.due(now, &mut next));
             if due {

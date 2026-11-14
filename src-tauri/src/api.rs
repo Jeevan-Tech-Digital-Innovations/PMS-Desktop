@@ -112,18 +112,30 @@ fn timezone_name() -> String {
 
 pub struct Api {
     http: reqwest::Client,
-    base: String,
+    base: std::sync::RwLock<String>,
     auth: Arc<Auth>,
     online: AtomicBool,
 }
 
 impl Api {
     pub fn new(http: reqwest::Client, base: String, auth: Arc<Auth>) -> Self {
-        Self { http, base, auth, online: AtomicBool::new(true) }
+        Self { http, base: std::sync::RwLock::new(base), auth, online: AtomicBool::new(true) }
     }
 
     pub fn is_online(&self) -> bool {
         self.online.load(Ordering::Relaxed)
+    }
+
+    pub fn base(&self) -> String {
+        self.base.read().map(|b| b.clone()).unwrap_or_default()
+    }
+
+    /// Debug-only end-to-end check: point the client at another base (e.g. an unreachable port).
+    #[cfg(debug_assertions)]
+    pub fn set_base(&self, base: &str) {
+        if let Ok(mut b) = self.base.write() {
+            *b = base.trim_end_matches('/').to_string();
+        }
     }
 
     pub fn auth(&self) -> &Arc<Auth> {
@@ -131,7 +143,7 @@ impl Api {
     }
 
     fn url(&self, path: &str) -> String {
-        format!("{}{}", self.base, path)
+        format!("{}{}", self.base(), path)
     }
 
     async fn once<F>(&self, build: &F, token: &str) -> AppResult<(u16, String)>
@@ -329,29 +341,31 @@ impl Api {
         captured_at: &str,
         activity_percent: u8,
         active_window_title: &str,
-    ) -> AppResult<()> {
+    ) -> AppResult<Option<i64>> {
         let url = self.url(&format!("/screenshots/upload/{time_log_id}"));
         let file_name = format!("screenshot_{time_log_id}_{}.jpg", chrono::Utc::now().timestamp_millis());
         let pct = activity_percent.to_string();
-        self.send(|c| {
-            let part = reqwest::multipart::Part::bytes(jpeg.clone())
-                .file_name(file_name.clone())
-                .mime_str("image/jpeg")
-                .expect("static mime");
-            let form = reqwest::multipart::Form::new()
-                .part("file", part)
-                .text("capturedAt", captured_at.to_string())
-                .text("keyboardActivityPercent", pct.clone())
-                .text("mouseActivityPercent", pct.clone())
-                .text("activeWindowTitle", active_window_title.to_string());
-            c.post(&url).multipart(form)
-        })
-        .await
-        .map(|_| ())
+        let text = self
+            .send(|c| {
+                let part = reqwest::multipart::Part::bytes(jpeg.clone())
+                    .file_name(file_name.clone())
+                    .mime_str("image/jpeg")
+                    .expect("static mime");
+                let form = reqwest::multipart::Form::new()
+                    .part("file", part)
+                    .text("capturedAt", captured_at.to_string())
+                    .text("keyboardActivityPercent", pct.clone())
+                    .text("mouseActivityPercent", pct.clone())
+                    .text("activeWindowTitle", active_window_title.to_string());
+                c.post(&url).multipart(form)
+            })
+            .await?;
+        Ok(parse_body(&text)?.map(unwrap_data).and_then(|d| d.get("screenshotId").and_then(Value::as_i64)))
     }
 
-    pub async fn app_usage(&self, items: &Value) -> AppResult<()> {
-        self.post("/activity/apps/bulk", Some(items.clone())).await.map(|_| ())
+    /// Returns how many rows the server accepted (length of the returned list, if any).
+    pub async fn app_usage(&self, items: &Value) -> AppResult<usize> {
+        Ok(self.post("/activity/apps/bulk", Some(items.clone())).await?.map(as_list).map(|l| l.len()).unwrap_or(0))
     }
 }
 

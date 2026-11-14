@@ -180,10 +180,33 @@ impl Queue {
         match meta.job {
             Job::Screenshot { time_log_id, captured_at, activity_percent, active_window_title } => {
                 let Ok(jpeg) = std::fs::read(self.blob_path(stem)) else { return Ok(()) };
-                api.upload_screenshot(time_log_id, jpeg, &captured_at, activity_percent, &active_window_title).await
+                api.upload_screenshot(time_log_id, jpeg, &captured_at, activity_percent, &active_window_title).await.map(|_| ())
             }
-            Job::AppUsage { items } => api.app_usage(&items).await,
+            Job::AppUsage { items } => api.app_usage(&items).await.map(|_| ()),
         }
+    }
+
+    /// One pass over every queued item (debug end-to-end check). Returns `(sent, still_queued)`.
+    #[cfg(debug_assertions)]
+    pub async fn drain_once(&self, api: &Api) -> (usize, usize) {
+        let mut sent = 0;
+        for item in self.list() {
+            match self.send(api, &item.stem).await {
+                Ok(()) => {
+                    self.remove(&item.stem);
+                    sent += 1;
+                }
+                Err(e) if e.is_retryable() || e.code == ErrorCode::Unauthorized => {
+                    log::info!("offline queue: {} kept ({e})", item.stem);
+                }
+                Err(e) => {
+                    log::warn!("offline queue: item {} rejected ({e}); dropped", item.stem);
+                    self.remove(&item.stem);
+                }
+            }
+        }
+        self.recount();
+        (sent, self.len())
     }
 
     /// Worker: runs forever. Call once.
