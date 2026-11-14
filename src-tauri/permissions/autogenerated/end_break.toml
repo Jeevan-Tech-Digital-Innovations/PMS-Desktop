@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-end-break"
+description = "Enables the end_break command without any pre-configured scope."
+commands.allow = ["end_break"]
+
+[[permission]]
+identifier = "deny-end-break"
+description = "Denies the end_break command without any pre-configured scope."
+commands.deny = ["end_break"]

@@ -1,0 +1,31 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+.teal {
+  background: var(--c-accent-soft);
+  color: var(--c-accent);
+}
+
+.amber {
+  background: var(--c-yellow-soft);
+  color: var(--c-yellow-dark);
+}
+
+.grey {
+  background: var(--c-grey-soft);
+  color: var(--c-grey-dark);
+}

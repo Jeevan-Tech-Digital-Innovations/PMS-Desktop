@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-submit-idle-note"
+description = "Enables the submit_idle_note command without any pre-configured scope."
+commands.allow = ["submit_idle_note"]
+
+[[permission]]
+identifier = "deny-submit-idle-note"
+description = "Denies the submit_idle_note command without any pre-configured scope."
+commands.deny = ["submit_idle_note"]
