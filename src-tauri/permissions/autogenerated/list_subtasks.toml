@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-list-subtasks"
+description = "Enables the list_subtasks command without any pre-configured scope."
+commands.allow = ["list_subtasks"]
+
+[[permission]]
+identifier = "deny-list-subtasks"
+description = "Denies the list_subtasks command without any pre-configured scope."
+commands.deny = ["list_subtasks"]

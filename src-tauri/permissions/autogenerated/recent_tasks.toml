@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-recent-tasks"
+description = "Enables the recent_tasks command without any pre-configured scope."
+commands.allow = ["recent_tasks"]
+
+[[permission]]
+identifier = "deny-recent-tasks"
+description = "Denies the recent_tasks command without any pre-configured scope."
+commands.deny = ["recent_tasks"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-list-break-reasons"
+description = "Enables the list_break_reasons command without any pre-configured scope."
+commands.allow = ["list_break_reasons"]
+
+[[permission]]
+identifier = "deny-list-break-reasons"
+description = "Denies the list_break_reasons command without any pre-configured scope."
+commands.deny = ["list_break_reasons"]
