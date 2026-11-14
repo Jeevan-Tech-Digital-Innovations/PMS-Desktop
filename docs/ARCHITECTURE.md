@@ -4,8 +4,7 @@ PMS Desktop is a tray time-tracking agent. The employee signs in, picks an **exi
 sub-sub-task, and starts the timer. While a timer runs, the agent sends heartbeats, screenshots and app usage to PMS-API.
 **Windows is the main platform**; macOS is supported.
 
-The Electron app this replaces lives in `legacy-electron/` for reference only (API shapes, idle rules). It will be deleted
-before merge.
+It replaces the Electron app (removed; see git history before this branch for its code).
 
 ```
 React screen (src/, TS, CSS Modules, PMS design tokens)
@@ -52,7 +51,7 @@ returns `403 error code: 1010` for library default user agents.
 
 ## 3. PMS-API calls used (`{API}` = `PMS_API_URL`; JSON camelCase; Bearer access token)
 
-Response shapes: see `legacy-electron/src/renderer/src/pages/**/**Api.services.ts` and `services/*.ts`; many wrap data in `{data: ...}`.
+Response shapes: see `src-tauri/src/api.rs`; many wrap data in `{data: ...}`.
 
 | Purpose | Call |
 |---|---|

@@ -18,7 +18,6 @@ PMS-Desktop/
 │   │   └── main.rs            binary entry point
 │   ├── Cargo.toml             Rust dependencies
 │   └── tauri.conf.json        window, bundle (NSIS, DMG) and build settings
-├── legacy-electron/           old Electron app, reference only; deleted before merge
 ├── index.html                 Vite entry page
 ├── package.json               npm scripts: dev, build, typecheck, test, check
 ├── tsconfig.json              TypeScript config for the frontend

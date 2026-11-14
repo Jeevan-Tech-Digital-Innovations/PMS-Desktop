@@ -7,9 +7,6 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig({
   plugins: [react()],
 
-  // Only scan our own entry (legacy-electron/ has its own index.html and is not installed)
-  optimizeDeps: { entries: ["index.html"] },
-
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors
