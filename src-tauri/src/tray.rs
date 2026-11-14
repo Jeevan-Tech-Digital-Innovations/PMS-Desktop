@@ -196,9 +196,12 @@ fn build_menu(
         .checked(autostart)
         .build(app)?;
 
-    let menu = MenuBuilder::new(app)
-        .item(&status_item)
-        .separator()
+    let mut menu = MenuBuilder::new(app).item(&status_item).separator();
+    // Linux tray icons (AppIndicator) send no click events, so the window needs a menu entry.
+    if cfg!(target_os = "linux") {
+        menu = menu.text("open", "Open PMS Desktop").separator();
+    }
+    let menu = menu
         .item(&toggle)
         .item(&away)
         .item(&stop)
@@ -268,7 +271,7 @@ pub fn refresh(app: &AppHandle, core: &Core) {
         let _ = tray.set_icon(Some(icon(kind)));
         st.icon = Some(kind);
     }
-    let _ = tray.set_tooltip(Some(format!("PMS Desktop — {status}")));
+    let _ = tray.set_tooltip(Some(format!("{} — {status}", crate::config::PRODUCT_NAME)));
 }
 
 pub fn show_window(app: &AppHandle) {
@@ -360,8 +363,8 @@ fn on_menu(app: &AppHandle, id: &str) {
         "about" => {
             let core = app.state::<Arc<Core>>();
             app.dialog()
-                .message(format!("PMS Desktop {}\n{}", crate::config::VERSION, core.cfg.api_url))
-                .title("About PMS Desktop")
+                .message(format!("{} {}\n{}", crate::config::PRODUCT_NAME, crate::config::VERSION, core.cfg.api_url))
+                .title(format!("About {}", crate::config::PRODUCT_NAME))
                 .buttons(MessageDialogButtons::Ok)
                 .show(|_| {});
         }
@@ -392,7 +395,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     app.manage(TrayHandle::default());
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon(IconKind::Stopped))
-        .tooltip("PMS Desktop")
+        .tooltip(crate::config::PRODUCT_NAME)
         .menu(&MenuBuilder::new(app).text("quit", "Quit").build()?)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| on_menu(app, event.id().as_ref()))

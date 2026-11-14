@@ -2,7 +2,7 @@
 
 PMS Desktop is a tray time-tracking agent. The employee signs in, picks an **existing** project → task → sub-task →
 sub-sub-task, and starts the timer. While a timer runs, the agent sends heartbeats, screenshots and app usage to PMS-API.
-**Windows is the main platform**; macOS is supported.
+**Platforms: Windows and Ubuntu** (22.04+, GNOME). The macOS code paths still compile but are not built or shipped.
 
 It replaces the Electron app (removed; see git history before this branch for its code).
 
@@ -14,7 +14,7 @@ Rust core (src-tauri/src/)
    ├─ auth.rs      Axis mobile login/refresh/logout, company switch, keychain
    ├─ api.rs       PMS-API client (token stays in Rust; UI never sees it)
    ├─ timer.rs     timer state machine, heartbeat 30s, active-timer poll 30s, overtime
-   ├─ tracker/     idle.rs · screenshot.rs · apps.rs · power.rs (sleep/lock)
+   ├─ tracker/     idle.rs · screenshot.rs · apps.rs · power.rs (sleep/lock) · linux.rs (X11/D-Bus)
    ├─ queue.rs     offline queue on disk with backoff
    ├─ settings.rs  employee tracking settings cache (15 min)
    ├─ tray.rs      tray menu + state icons
@@ -22,6 +22,23 @@ Rust core (src-tauri/src/)
 ```
 
 ## 1. Config
+
+### Channels
+
+| | Staging | Production |
+|---|---|---|
+| URLs (compiled in by CI) | `stagingpmsapi` / `stagingaxisapi` / `stagingpms` `.enjev.com` | `pmsapi` / `axisapi` / `pms` `.enjev.com` |
+| `productName` | PMS Desktop Staging | PMS Desktop |
+| `identifier` | `com.jeevantech.pms.desktop.staging` | `com.jeevantech.pms.desktop` |
+| Tauri config | `tauri.conf.json` + `tauri.staging.conf.json` (`--config`) | `tauri.conf.json` |
+
+`build.rs` reads `identifier` and `productName` after the overlay (the Tauri CLI passes it in `TAURI_CONFIG`) and compiles
+them in as `config::APP_IDENTIFIER` / `config::PRODUCT_NAME`. Everything per-install keys off the identifier: the keychain
+service, the data folder `<OS data dir>/<identifier>/` (queue, first-run flag, device-id fallback; Tauri's app data and
+log folders use the same identifier), the single-instance lock and the autostart entry (product name). Staging and
+production therefore install side by side and never share a session.
+
+### Variables
 
 Read at startup from environment variables (dev) with compile-time defaults (release, via `option_env!`):
 
@@ -32,6 +49,7 @@ Read at startup from environment variables (dev) with compile-time defaults (rel
 | `PMS_WEB_URL` | `https://stagingpms.enjev.com` | "Open PMS" target |
 | `PMS_DEV_EMAIL` / `PMS_DEV_PASSWORD` | from the shell | **Debug builds only**: sign in automatically at start-up. Ignored in release builds. |
 | `PMS_DEV_FAST` | `1` to enable | **Debug builds only**: idle 30 s instead of 5 min, auto-stop 2 min instead of 60, screenshot every 60 s, overtime at 3 min. |
+| `PMS_SELFTEST_HEADLESS` | `1` to enable | `--selftest` only: failing desktop steps (screenshot, active window, idle) are SKIP instead of FAIL. Used by CI. |
 
 ## 2. Axis (identity) — JSON is **snake_case**
 
@@ -45,8 +63,13 @@ returns `403 error code: 1010` for library default user agents.
 | `POST {AXIS}/api/v1/auth/mobile/logout` | `{refresh_token}` | 204 |
 | `POST {AXIS}/api/v1/auth/switch-tenant` | Bearer access token, `{tenant_id}` | `{access_token, active_tenant_id, roles, permissions, active_orgs, expires_in}`; Axis remembers the choice, so later refreshes stay on that company |
 
-- `device_id`: a UUID generated once per install and stored. `device_name`: the computer name. `platform`: `"windows"` / `"macos"`.
-- Refresh token + device id live in the OS keychain (`keyring` crate, service `com.jeevantech.pms.desktop`). The access token is kept in memory.
+- `device_id`: a UUID generated once per install and stored. `device_name`: the computer name. `platform`: `"windows"` /
+  `"linux"` (`"macos"` in dev builds on a Mac).
+- Refresh token + device id live in the OS keychain (`keyring` crate; service = the app identifier, see section 1):
+  Windows Credential Manager, Linux Secret Service (GNOME Keyring). If the keychain refuses a write (no Secret Service
+  running), the value is held in memory for this run only and the employee signs in again next start; the refresh token
+  is never written to a file. The device id (not a secret) also gets a file copy in the data folder in that case. The
+  access token is kept in memory.
 - Refresh 60 s before expiry, and once on any 401 from PMS-API (then retry the call once). If refresh returns 400/401/403, sign out.
 
 ## 3. PMS-API calls used (`{API}` = `PMS_API_URL`; JSON camelCase; Bearer access token)
@@ -127,7 +150,11 @@ type TimerSnapshot = {
 | `submit_idle_note` | `{ text }` | `void` |
 | `overtime_decision` | `{ continueOvertime: boolean }` | `TimerSnapshot` |
 | `open_pms_web` | – | `void` |
-| `app_info` | – | `{ version: string; platform: "windows" \| "macos"; apiUrl: string; dev: boolean }` |
+| `app_info` | – | `{ version: string; platform: "windows" \| "linux" \| "macos"; apiUrl: string; dev: boolean; linuxSession: "x11" \| "wayland" \| null }` |
+
+`linuxSession` comes from `XDG_SESSION_TYPE`, else `WAYLAND_DISPLAY` / `DISPLAY`; `null` on Windows. On `"wayland"` the
+screen shows a one-time dismissible notice (UI-only flag in `localStorage`): "For full tracking on Ubuntu, choose
+“Ubuntu on Xorg” at the login screen (gear icon)."
 
 ## 5. Events (`listen`)
 
@@ -151,11 +178,22 @@ type TimerSnapshot = {
   lunch/dinner/meal 30 min); warn once when the limit passes. Capture and idle detection pause during a break.
 - **Overtime:** at 8 h of work → prompt "Continue as overtime?" → `OVERTIME` transition, or stop.
 - **Sleep/lock:** detected by a 5 s loop (clock jump > 30 s = slept; lock = idle rising / OS session lock where available) →
-  send a heartbeat immediately, pause capture, re-check the active timer on wake.
+  send a heartbeat immediately, pause capture, re-check the active timer on wake. OS lock: Windows = input desktop not
+  openable; Linux = `org.gnome.ScreenSaver.GetActive` (session bus), else systemd-logind `LockedHint` of the session
+  (system bus). No answer counts as "not locked".
 - **Web timers:** the 30 s active-timer poll picks up a timer started in the web app and starts tracking; if the server
   says no timer, stop tracking (15 s grace after a local start).
 
 ## 7. Tracking
+
+Platform sources:
+
+| | Windows | Ubuntu, Xorg session | Ubuntu, Wayland session |
+|---|---|---|---|
+| Idle time | `GetLastInputInfo` | XScreenSaver extension (`x11rb`), else GNOME Mutter | GNOME Mutter `org.gnome.Mutter.IdleMonitor.GetIdletime` (D-Bus) |
+| Active window | `active-win-pos-rs` | `active-win-pos-rs` (EWMH `_NET_ACTIVE_WINDOW`, `/proc/<pid>/exe`) | X11 (XWayland) windows only; otherwise app `"Unknown"`, empty title |
+| Screenshots | `xcap` (GDI) | X11 root window via `x11rb` (all monitors) | Not available (no X11 root); a failure is logged once per run |
+| Tray | Click toggles the window | AppIndicator: click opens the menu; menu item **Open PMS Desktop** | same |
 
 - Screenshots: every `screenshotTimer` minutes (default 10), at a random moment inside each interval; all monitors stitched
   side by side; longest edge ≤ 1920 px; JPEG quality 70; `screenshotBlur = On` → pixelate (downscale ×16 then upscale);
@@ -192,4 +230,20 @@ type TimerSnapshot = {
 ```
 
 Icon per state: working (teal), paused/away/break (amber), idle (grey), stopped (outline). Left-click toggles the window
-next to the tray. Single instance: a second launch focuses the window.
+next to the tray (Windows). Linux AppIndicator icons send no clicks, so on Linux the menu starts with **Open PMS Desktop**
+and the window opens at the top right. Single instance: a second launch focuses the window.
+
+## 10. CI and releases
+
+`.github/workflows/desktop-build.yml`:
+
+| Job | Runner | What |
+|---|---|---|
+| `checks` | windows-latest | typecheck, frontend tests, `cargo test`, `cargo clippy --all-targets -D warnings` |
+| `checks-linux` | ubuntu-22.04 | system packages (`.github/scripts/install-linux-deps.sh`), `cargo test`, clippy |
+| `selftest-windows` | windows-latest | `cargo run -- --selftest` against staging with secrets `PMS_STAGING_TEST_EMAIL` / `PMS_STAGING_TEST_PASSWORD` (read-only: no timers, no uploads; skipped with a notice when unset) |
+| `build` | via `desktop-bundle.yml` | pull requests (staging) and manual runs (`channel` input): Windows NSIS + Ubuntu deb/AppImage as artifacts |
+| `release` | via `desktop-bundle.yml` | push to `build/staging` → pre-release `desktop-staging-v<version>-<run>`; push to `main` → release `desktop-v<version>`; `contents: write` only here |
+
+Repository variables `PMS_API_URL_<CHANNEL>`, `AXIS_API_URL_<CHANNEL>`, `PMS_WEB_URL_<CHANNEL>` (`STAGING` /
+`PRODUCTION`) override the default URLs.

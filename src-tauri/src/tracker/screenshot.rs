@@ -128,6 +128,7 @@ pub fn process(images: &[RgbaImage], blur: bool) -> Result<Vec<u8>, String> {
 }
 
 /// Capture every monitor, ordered left to right. Blocking: call via `spawn_blocking`.
+#[cfg(not(target_os = "linux"))]
 pub fn capture_all() -> Result<Vec<RgbaImage>, String> {
     let mut monitors = xcap::Monitor::all().map_err(|e| e.to_string())?;
     monitors.sort_by_key(|m| (m.x().unwrap_or(0), m.y().unwrap_or(0)));
@@ -143,6 +144,13 @@ pub fn capture_all() -> Result<Vec<RgbaImage>, String> {
         return Err(last_err.unwrap_or_else(|| "no monitors found".to_string()));
     }
     Ok(images)
+}
+
+/// Linux: one image of the X11 root window, which already spans every monitor as arranged (no PipeWire, so the
+/// build runs on Ubuntu 22.04 and newer).
+#[cfg(target_os = "linux")]
+pub fn capture_all() -> Result<Vec<RgbaImage>, String> {
+    crate::tracker::linux::capture_root().map(|img| vec![img])
 }
 
 /// Capture + process in one blocking call.

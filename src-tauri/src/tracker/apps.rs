@@ -61,6 +61,22 @@ const FRIENDLY: &[(&str, &str)] = &[
     ("postman", "Postman"),
     ("terminal", "Terminal"),
     ("iterm2", "iTerm2"),
+    // Linux: exe stems and X11 WM_CLASS names.
+    ("google-chrome", "Google Chrome"),
+    ("chromium", "Chromium"),
+    ("chromium-browser", "Chromium"),
+    ("microsoft-edge", "Microsoft Edge"),
+    ("teams-for-linux", "Microsoft Teams"),
+    ("gnome-terminal-server", "Terminal"),
+    ("gnome-terminal", "Terminal"),
+    ("nautilus", "Files"),
+    ("org.gnome.nautilus", "Files"),
+    ("gnome-text-editor", "Text Editor"),
+    ("gedit", "Text Editor"),
+    ("soffice", "LibreOffice"),
+    ("soffice.bin", "LibreOffice"),
+    ("libreoffice", "LibreOffice"),
+    ("thunderbird", "Thunderbird"),
     // Ourselves (exe stem, product name, legacy package description prefix).
     ("pms-desktop", OWN_APP_NAME),
     ("pms_desktop", OWN_APP_NAME),
@@ -106,7 +122,7 @@ pub fn program_name(exe_stem: &str, os_name: &str, is_self: bool) -> String {
     if !stem.is_empty() {
         return stem.to_string();
     }
-    "Unknown".to_string()
+    UNKNOWN_APP.to_string()
 }
 
 fn normalize_for_compare(s: &str) -> String {
@@ -153,9 +169,17 @@ pub struct WindowInfo {
     pub title: String,
 }
 
+/// App name recorded when the program cannot be read at all (GNOME on Wayland, native Wayland windows).
+pub const UNKNOWN_APP: &str = "Unknown";
+
 /// Read the foreground window. Blocking but fast; call from a blocking-friendly context.
+///
+/// On a Linux Wayland session only X11 (XWayland) windows can be read; for anything else the time is
+/// recorded as [`UNKNOWN_APP`] with no title instead of being dropped.
 pub fn active_window() -> Option<WindowInfo> {
-    let w = active_win_pos_rs::get_active_window().ok()?;
+    let Ok(w) = active_win_pos_rs::get_active_window() else {
+        return crate::config::is_wayland().then(|| WindowInfo { app: UNKNOWN_APP.to_string(), title: String::new() });
+    };
     let stem = w.process_path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
     let is_self = w.process_id == u64::from(std::process::id());
     let os_name = w.app_name.clone();
@@ -333,6 +357,16 @@ mod tests {
         assert_eq!(program_name("Google Chrome", "Google Chrome", false), "Google Chrome");
         assert_eq!(program_name("Code", "Electron", false), "Visual Studio Code");
         assert_eq!(program_name("Finder", "Finder", false), "Finder");
+    }
+
+    #[test]
+    fn linux_names() {
+        assert_eq!(program_name("chrome", "Google-chrome", false), "Google Chrome");
+        assert_eq!(program_name("gnome-terminal-server", "Gnome-terminal", false), "Terminal");
+        // `/usr/lib/libreoffice/program/soffice.bin` has the file stem `soffice`.
+        assert_eq!(program_name("soffice", "libreoffice-writer", false), "LibreOffice");
+        assert_eq!(program_name("code", "Code", false), "Visual Studio Code");
+        assert_eq!(program_name("", "", false), UNKNOWN_APP);
     }
 
     #[test]

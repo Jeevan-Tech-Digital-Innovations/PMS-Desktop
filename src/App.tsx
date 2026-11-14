@@ -2,6 +2,7 @@ import { IdleNoteSheet } from "./components/IdleNoteSheet/IdleNoteSheet";
 import { OvertimeDialog } from "./components/OvertimeDialog/OvertimeDialog";
 import { Spinner } from "./components/Spinner/Spinner";
 import { Toasts } from "./components/Toasts/Toasts";
+import { WaylandNotice } from "./components/WaylandNotice/WaylandNotice";
 import { useAppState } from "./state/StoreProvider";
 import { NoticeView } from "./views/NoticeView";
 import { PickerView } from "./views/PickerView";
@@ -32,7 +33,12 @@ export default function App() {
   const signedIn = useAppState((s) => s.session?.firstRunNoticeAccepted === true);
   return (
     <>
-      <Screen />
+      <div className={styles.shell}>
+        <WaylandNotice />
+        <div className={styles.screen}>
+          <Screen />
+        </div>
+      </div>
       {signedIn && (
         <>
           <IdleNoteSheet />

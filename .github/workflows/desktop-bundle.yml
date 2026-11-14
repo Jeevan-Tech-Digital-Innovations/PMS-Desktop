@@ -1,0 +1,133 @@
+name: Desktop bundle
+
+# Called by desktop-build.yml. Builds the Windows (NSIS) and Ubuntu (deb, AppImage) installers for one channel,
+# uploads them as artifacts and, with `release: true`, publishes them as a GitHub Release. The token's
+# permissions come from the calling job (contents: write only for releases).
+on:
+  workflow_call:
+    inputs:
+      channel:
+        description: staging | production
+        type: string
+        required: true
+      release:
+        description: Publish a GitHub Release
+        type: boolean
+        default: false
+
+jobs:
+  bundle:
+    name: ${{ matrix.name }} (${{ inputs.channel }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows
+            os: windows-latest
+            bundles: nsis
+            bundle-path: |
+              src-tauri/target/**/release/bundle/nsis/*.exe
+          - name: ubuntu
+            os: ubuntu-22.04
+            bundles: deb,appimage
+            bundle-path: |
+              src-tauri/target/**/release/bundle/deb/*.deb
+              src-tauri/target/**/release/bundle/appimage/*.AppImage
+    env:
+      CHANNEL: ${{ inputs.channel }}
+      # Optional. Only used if updater signing is enabled; the build does not need them.
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Server URLs are compiled in (option_env! in src-tauri/src/config.rs). Repository variables
+      # <NAME>_STAGING / <NAME>_PRODUCTION override the defaults per channel. Staging also applies the
+      # tauri.staging.conf.json overlay: its own app name, identifier, binary, keychain entry and data folder.
+      - name: Channel settings
+        shell: bash
+        env:
+          API_STAGING: ${{ vars.PMS_API_URL_STAGING || 'https://stagingpmsapi.enjev.com/api/v1' }}
+          AXIS_STAGING: ${{ vars.AXIS_API_URL_STAGING || 'https://stagingaxisapi.enjev.com' }}
+          WEB_STAGING: ${{ vars.PMS_WEB_URL_STAGING || 'https://stagingpms.enjev.com' }}
+          API_PRODUCTION: ${{ vars.PMS_API_URL_PRODUCTION || 'https://pmsapi.enjev.com/api/v1' }}
+          AXIS_PRODUCTION: ${{ vars.AXIS_API_URL_PRODUCTION || 'https://axisapi.enjev.com' }}
+          WEB_PRODUCTION: ${{ vars.PMS_WEB_URL_PRODUCTION || 'https://pms.enjev.com' }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          case "$CHANNEL" in
+            production)
+              api="$API_PRODUCTION"; axis="$AXIS_PRODUCTION"; web="$WEB_PRODUCTION"
+              config_args=""
+              tag="desktop-v__VERSION__"
+              name="PMS Desktop v__VERSION__"
+              prerelease=false
+              ;;
+            staging)
+              api="$API_STAGING"; axis="$AXIS_STAGING"; web="$WEB_STAGING"
+              config_args="--config src-tauri/tauri.staging.conf.json"
+              tag="desktop-staging-v__VERSION__-$RUN_NUMBER"
+              name="PMS Desktop Staging v__VERSION__ (build $RUN_NUMBER)"
+              prerelease=true
+              ;;
+            *)
+              echo "::error::Unknown channel '$CHANNEL' (expected staging or production)"
+              exit 1
+              ;;
+          esac
+          {
+            echo "PMS_API_URL=$api"
+            echo "AXIS_API_URL=$axis"
+            echo "PMS_WEB_URL=$web"
+            echo "TAURI_CONFIG_ARGS=$config_args"
+            echo "RELEASE_TAG=$tag"
+            echo "RELEASE_NAME=$name"
+            echo "RELEASE_PRERELEASE=$prerelease"
+          } >> "$GITHUB_ENV"
+          echo "Channel $CHANNEL: API $api, Axis $axis, web $web"
+
+      - name: Install system packages
+        if: runner.os == 'Linux'
+        run: .github/scripts/install-linux-deps.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # With an empty tagName no release is created. Both matrix jobs use the same tag, so they publish
+      # into one release.
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: .
+          args: --bundles ${{ matrix.bundles }} ${{ env.TAURI_CONFIG_ARGS }}
+          tagName: ${{ inputs.release && env.RELEASE_TAG || '' }}
+          releaseName: ${{ env.RELEASE_NAME }}
+          releaseBody: |
+            ${{ inputs.channel == 'production' && 'PMS Desktop' || 'PMS Desktop Staging' }} for Windows (.exe) and Ubuntu (.deb, .AppImage).
+            Server: ${{ env.PMS_API_URL }}
+            Installing: docs/INSTALL.md
+          releaseDraft: false
+          prerelease: ${{ env.RELEASE_PRERELEASE == 'true' }}
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: pms-desktop-${{ inputs.channel }}-${{ matrix.name }}
+          path: ${{ matrix.bundle-path }}
+          if-no-files-found: error
+          retention-days: 14

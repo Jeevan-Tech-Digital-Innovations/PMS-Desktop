@@ -22,12 +22,12 @@ pub mod ui;
 
 use std::sync::Arc;
 
-use tauri::{RunEvent, WindowEvent};
+use tauri::{Manager, RunEvent, WindowEvent};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let cfg = config::Config::load();
-    let core = app::Core::new(cfg, Arc::new(auth::KeychainStore));
+    let core = app::Core::new(cfg, Arc::new(auth::KeychainStore::new()));
     let setup_core = core.clone();
 
     tauri::Builder::default()
@@ -76,7 +76,19 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             let core = setup_core;
-            log::info!("PMS Desktop {} starting (API {}, dev {})", config::VERSION, core.cfg.api_url, core.cfg.dev);
+            log::info!(
+                "{} {} starting ({}, API {}, dev {}, linux session {:?})",
+                config::PRODUCT_NAME,
+                config::VERSION,
+                config::APP_IDENTIFIER,
+                core.cfg.api_url,
+                core.cfg.dev,
+                config::linux_session()
+            );
+            // Staging builds say so in the title bar.
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.set_title(config::PRODUCT_NAME);
+            }
             core.ui.attach(app.handle().clone());
             tray::create(app.handle())?;
             core.spawn_background();

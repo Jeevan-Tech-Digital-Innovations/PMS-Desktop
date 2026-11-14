@@ -1,5 +1,6 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { WAYLAND_NOTICE_KEY, WAYLAND_NOTICE_TEXT } from "./components/WaylandNotice/WaylandNotice";
 import { setupApp, TASK } from "./test/helpers";
 
 describe("sign in", () => {
@@ -212,5 +213,34 @@ describe("prompts", () => {
     await act(async () => mock.toast("success", "Saved"));
     expect(screen.getByText("Saved")).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText("Saved")).not.toBeInTheDocument(), { timeout: 4000 });
+  });
+});
+
+describe("Ubuntu Wayland notice", () => {
+  beforeEach(() => localStorage.removeItem(WAYLAND_NOTICE_KEY));
+
+  it("shows on a Wayland session until dismissed, and stays dismissed", async () => {
+    const { user, unmount } = setupApp({ signedIn: true, linuxSession: "wayland" });
+    const note = await screen.findByRole("note");
+    expect(note).toHaveTextContent(WAYLAND_NOTICE_TEXT);
+    expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
+    await user.click(within(note).getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    expect(localStorage.getItem(WAYLAND_NOTICE_KEY)).toBe("1");
+
+    unmount();
+    setupApp({ signedIn: true, linuxSession: "wayland" });
+    await screen.findByRole("button", { name: "Start" });
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
+
+  it("is not shown on X11 or Windows", async () => {
+    const { unmount } = setupApp({ linuxSession: "x11" });
+    await screen.findByLabelText("Email");
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+    unmount();
+    setupApp();
+    await screen.findByLabelText("Email");
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
 });

@@ -1,6 +1,7 @@
 //! System idle time (seconds since the last keyboard/mouse input, system-wide).
 //!
-//! Windows: `GetLastInputInfo`. macOS: `CGEventSourceSecondsSinceLastEventType`. No hooks, no keylogging.
+//! Windows: `GetLastInputInfo`. Linux: GNOME Mutter IdleMonitor (D-Bus) or the X11 XScreenSaver extension
+//! (see `tracker::linux`). macOS: `CGEventSourceSecondsSinceLastEventType`. No hooks, no keylogging.
 
 /// Seconds since the last user input, or `None` if the OS call fails.
 pub fn system_idle_secs() -> Option<u64> {
@@ -70,7 +71,14 @@ mod imp {
     }
 }
 
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(target_os = "linux")]
+mod imp {
+    pub fn idle_secs() -> Option<u64> {
+        crate::tracker::linux::idle_secs(crate::config::is_wayland())
+    }
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
 mod imp {
     pub fn idle_secs() -> Option<u64> {
         None
