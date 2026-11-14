@@ -45,7 +45,7 @@ compiled in at build time, with the staging defaults shown below.
 
 | Variable | Dev default | Meaning |
 |---|---|---|
-| `PMS_API_URL` | `http://localhost:8080/api/v1` | PMS-API base URL |
+| `PMS_API_URL` | `http://localhost:8080/api/v1` (release default: `https://stagingpmsapi.enjev.com/api/v1`) | PMS-API base URL |
 | `AXIS_API_URL` | `https://stagingaxisapi.enjev.com` | Axis identity base URL (sign-in) |
 | `PMS_WEB_URL` | `https://stagingpms.enjev.com` | Target of "Open PMS" |
 | `PMS_DEV_EMAIL` / `PMS_DEV_PASSWORD` | unset | Debug builds only: sign in automatically at start-up. Ignored in release builds. |

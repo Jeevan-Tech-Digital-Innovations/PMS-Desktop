@@ -10,7 +10,8 @@ pub const APP_IDENTIFIER: &str = "com.jeevantech.pms.desktop";
 pub const KEYCHAIN_SERVICE: &str = "com.jeevantech.pms.desktop";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-const DEFAULT_API_URL: &str = "http://localhost:8080/api/v1";
+/// Debug builds default to a local PMS-API; release builds default to staging unless CI bakes in another URL.
+const DEFAULT_API_URL: &str = if cfg!(debug_assertions) { "http://localhost:8080/api/v1" } else { "https://stagingpmsapi.enjev.com/api/v1" };
 const DEFAULT_AXIS_URL: &str = "https://stagingaxisapi.enjev.com";
 const DEFAULT_WEB_URL: &str = "https://stagingpms.enjev.com";
 

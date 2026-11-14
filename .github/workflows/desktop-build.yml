@@ -65,7 +65,7 @@ jobs:
     env:
       # Compile-time defaults for the app (read with option_env! in Rust).
       # Set repository variables to override; the fallbacks are the staging hosts.
-      PMS_API_URL: ${{ vars.PMS_API_URL || 'https://stagingapi.enjev.com/api/v1' }}
+      PMS_API_URL: ${{ vars.PMS_API_URL || 'https://stagingpmsapi.enjev.com/api/v1' }}
       AXIS_API_URL: ${{ vars.AXIS_API_URL || 'https://stagingaxisapi.enjev.com' }}
       PMS_WEB_URL: ${{ vars.PMS_WEB_URL || 'https://stagingpms.enjev.com' }}
       # Optional. Only used if updater signing is enabled; the build does not need them.
