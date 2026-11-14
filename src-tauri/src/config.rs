@@ -123,7 +123,45 @@ impl Config {
     }
 }
 
-/// `"windows"` / `"macos"` (contract `app_info.platform` and Axis `platform`).
+/// Linux desktop session from `XDG_SESSION_TYPE`, then `WAYLAND_DISPLAY` / `DISPLAY`. Pure, for tests.
+pub fn classify_linux_session(
+    xdg_session_type: Option<&str>,
+    wayland_display: Option<&str>,
+    display: Option<&str>,
+) -> Option<&'static str> {
+    match xdg_session_type.map(|s| s.trim().to_ascii_lowercase()).as_deref() {
+        Some("wayland") => return Some("wayland"),
+        Some("x11") => return Some("x11"),
+        _ => {}
+    }
+    let set = |v: Option<&str>| v.is_some_and(|v| !v.trim().is_empty());
+    if set(wayland_display) {
+        Some("wayland")
+    } else if set(display) {
+        Some("x11")
+    } else {
+        None
+    }
+}
+
+/// `Some("x11" | "wayland")` on Linux (contract `app_info.linuxSession`), `None` elsewhere or when unknown.
+/// On Wayland, window titles cannot be read and screenshots go through the desktop portal.
+pub fn linux_session() -> Option<&'static str> {
+    if !cfg!(target_os = "linux") {
+        return None;
+    }
+    static SESSION: std::sync::OnceLock<Option<&'static str>> = std::sync::OnceLock::new();
+    *SESSION.get_or_init(|| {
+        let var = |k: &str| std::env::var(k).ok();
+        classify_linux_session(var("XDG_SESSION_TYPE").as_deref(), var("WAYLAND_DISPLAY").as_deref(), var("DISPLAY").as_deref())
+    })
+}
+
+pub fn is_wayland() -> bool {
+    linux_session() == Some("wayland")
+}
+
+/// `"windows"` / `"linux"` (`"macos"` still compiles) (contract `app_info.platform` and Axis `platform`).
 pub fn platform() -> &'static str {
     if cfg!(target_os = "windows") {
         "windows"
@@ -163,6 +201,19 @@ mod tests {
         assert!(ua.starts_with("PMS-Desktop/"));
         assert!(ua.to_lowercase().contains("pms-desktop"));
         assert!(ua.ends_with(')'));
+    }
+
+    #[test]
+    fn linux_session_detection() {
+        assert_eq!(classify_linux_session(Some("wayland"), None, Some(":0")), Some("wayland"));
+        assert_eq!(classify_linux_session(Some("X11"), Some("wayland-0"), None), Some("x11"));
+        assert_eq!(classify_linux_session(Some("tty"), Some("wayland-0"), Some(":0")), Some("wayland"));
+        assert_eq!(classify_linux_session(None, None, Some(":1")), Some("x11"));
+        assert_eq!(classify_linux_session(None, Some(" "), None), None);
+        assert_eq!(classify_linux_session(None, None, None), None);
+        if !cfg!(target_os = "linux") {
+            assert_eq!(linux_session(), None);
+        }
     }
 
     #[test]

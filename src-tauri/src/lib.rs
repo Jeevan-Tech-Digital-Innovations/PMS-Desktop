@@ -27,7 +27,7 @@ use tauri::{RunEvent, WindowEvent};
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let cfg = config::Config::load();
-    let core = app::Core::new(cfg, Arc::new(auth::KeychainStore));
+    let core = app::Core::new(cfg, Arc::new(auth::KeychainStore::new()));
     let setup_core = core.clone();
 
     tauri::Builder::default()
@@ -76,7 +76,13 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             let core = setup_core;
-            log::info!("PMS Desktop {} starting (API {}, dev {})", config::VERSION, core.cfg.api_url, core.cfg.dev);
+            log::info!(
+                "PMS Desktop {} starting (API {}, dev {}, linux session {:?})",
+                config::VERSION,
+                core.cfg.api_url,
+                core.cfg.dev,
+                config::linux_session()
+            );
             core.ui.attach(app.handle().clone());
             tray::create(app.handle())?;
             core.spawn_background();

@@ -196,9 +196,12 @@ fn build_menu(
         .checked(autostart)
         .build(app)?;
 
-    let menu = MenuBuilder::new(app)
-        .item(&status_item)
-        .separator()
+    let mut menu = MenuBuilder::new(app).item(&status_item).separator();
+    // Linux tray icons (AppIndicator) send no click events, so the window needs a menu entry.
+    if cfg!(target_os = "linux") {
+        menu = menu.text("open", "Open PMS Desktop").separator();
+    }
+    let menu = menu
         .item(&toggle)
         .item(&away)
         .item(&stop)

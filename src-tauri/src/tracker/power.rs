@@ -1,5 +1,6 @@
 //! Sleep / lock detection (docs/ARCHITECTURE.md section 6): a 5 s loop where a wall-clock jump of more
-//! than 30 s means the machine slept; lock comes from the OS where available (Windows input desktop).
+//! than 30 s means the machine slept; lock comes from the OS where available (Windows input desktop, Linux
+//! GNOME ScreenSaver / systemd-logind over D-Bus).
 
 use std::time::{Duration, SystemTime};
 
@@ -66,7 +67,14 @@ pub fn session_locked() -> Option<bool> {
     Some(false)
 }
 
-#[cfg(not(target_os = "windows"))]
+/// Linux: GNOME ScreenSaver, else logind `LockedHint`. Best effort: no answer means "not locked", so a lost
+/// D-Bus connection never leaves capture paused.
+#[cfg(target_os = "linux")]
+pub fn session_locked() -> Option<bool> {
+    Some(crate::tracker::linux::screen_locked().unwrap_or(false))
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
 pub fn session_locked() -> Option<bool> {
     None
 }

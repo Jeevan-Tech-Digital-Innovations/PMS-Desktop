@@ -721,7 +721,7 @@ impl Core {
 
     fn window_title_for_upload(&self, mode: TrackApps) -> String {
         let w = lock(&self.track).last_window.clone();
-        let Some(w) = w else { return "Unknown".into() };
+        let Some(w) = w else { return apps::UNKNOWN_APP.into() };
         match mode {
             TrackApps::Off => "Restricted".into(),
             TrackApps::AppsOnly => w.app,
@@ -767,7 +767,15 @@ impl Core {
                 }
             }
             Ok(None) => {}
-            Err(e) => log::warn!("screenshot capture failed: {e}"),
+            // Once per run: on a Linux Wayland session (or a locked-down PC) every interval would fail the same way.
+            Err(e) => {
+                static WARNED: AtomicBool = AtomicBool::new(false);
+                if WARNED.swap(true, Ordering::Relaxed) {
+                    log::debug!("screenshot capture failed: {e}");
+                } else {
+                    log::warn!("screenshot capture failed (further failures are not logged this run): {e}");
+                }
+            }
         }
     }
 

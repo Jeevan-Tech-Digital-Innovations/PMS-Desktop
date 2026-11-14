@@ -131,5 +131,6 @@ pub async fn app_info(core: CoreState<'_>) -> AppResult<AppInfo> {
         platform: crate::config::platform().to_string(),
         api_url: core.cfg.api_url.clone(),
         dev: core.cfg.dev,
+        linux_session: crate::config::linux_session().map(str::to_string),
     })
 }

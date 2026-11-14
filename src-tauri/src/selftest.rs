@@ -4,6 +4,9 @@
 //! touched), switches to the SAME active company, reads projects / tasks / settings / active timer,
 //! captures one screenshot to a temp file (no upload), reads the active window and system idle time,
 //! then signs the self-test device out again. It never starts timers, uploads or prints secrets.
+//!
+//! `PMS_SELFTEST_HEADLESS=1` (CI runners without an interactive desktop): a failing screenshot, active-window
+//! or idle step is reported as SKIP instead of FAIL. The API steps still have to pass.
 
 use std::sync::Arc;
 use std::time::Instant;
@@ -43,6 +46,10 @@ async fn run_async() -> i32 {
             ok == Some(true)
         }};
     }
+
+    let headless = std::env::var("PMS_SELFTEST_HEADLESS").is_ok_and(|v| v == "1" || v.eq_ignore_ascii_case("true"));
+    // Desktop-only steps: a failure is a SKIP when headless.
+    let desktop = |ok: bool| if ok { Some(true) } else if headless { None } else { Some(false) };
 
     let (Some(email), Some(password)) = (cfg.dev_email.clone(), cfg.dev_password.clone()) else {
         println!("FAIL: set PMS_DEV_EMAIL and PMS_DEV_PASSWORD");
@@ -149,25 +156,22 @@ async fn run_async() -> i32 {
                 let path = std::env::temp_dir().join("pms-desktop-selftest.jpg");
                 match std::fs::write(&path, &jpeg) {
                     Ok(()) => (Some(true), format!("{} KB → {}", jpeg.len() / 1024, path.display())),
-                    Err(e) => (Some(false), e.to_string()),
+                    Err(e) => (desktop(false), e.to_string()),
                 }
             }
-            Ok(Err(e)) => (
-                Some(false),
-                format!("{} (macOS: grant Screen Recording to the terminal)", short(&e, 120)),
-            ),
-            Err(e) => (Some(false), e.to_string()),
+            Ok(Err(e)) => (desktop(false), short(&e, 120)),
+            Err(e) => (desktop(false), e.to_string()),
         }
     });
 
     step!("active window", match tokio::task::spawn_blocking(apps::active_window).await.ok().flatten() {
         Some(w) => (Some(true), format!("app \"{}\" · title \"{}\"", w.app, short(&w.title, 60))),
-        None => (Some(false), "could not read the foreground window".into()),
+        None => (desktop(false), "could not read the foreground window".into()),
     });
 
     step!("system idle", match idle::system_idle_secs() {
         Some(s) => (Some(true), format!("{s} s since last input")),
-        None => (Some(false), "unavailable".into()),
+        None => (desktop(false), "unavailable".into()),
     });
 
     if signed_in {

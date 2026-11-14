@@ -4,7 +4,7 @@
 //! live in the OS keychain. The refresh token rotates, so only one refresh is ever in flight.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
@@ -27,32 +27,67 @@ pub trait SecretStore: Send + Sync {
     fn delete(&self, key: &str);
 }
 
-/// OS keychain (Windows Credential Manager / macOS Keychain).
-pub struct KeychainStore;
+/// OS keychain: Windows Credential Manager, Linux Secret Service (GNOME Keyring / KWallet over D-Bus), macOS
+/// Keychain. Service name = the app identifier, so staging and production builds keep separate sessions.
+///
+/// When the keychain refuses a write (for example no Secret Service on a Linux desktop), the value is kept in
+/// memory for this run only: the employee signs in again next start. Secrets are never written to a file.
+pub struct KeychainStore {
+    service: &'static str,
+    memory: MemoryStore,
+    warned: AtomicBool,
+}
+
+impl KeychainStore {
+    pub fn new() -> Self {
+        Self { service: KEYCHAIN_SERVICE, memory: MemoryStore::default(), warned: AtomicBool::new(false) }
+    }
+
+    fn warn_once(&self, what: &str, key: &str, e: &keyring::Error) {
+        if !self.warned.swap(true, Ordering::Relaxed) {
+            log::warn!("keychain {what} failed for {key}: {e}; keeping the session in memory only (sign in again after restart)");
+        }
+    }
+}
+
+impl Default for KeychainStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl SecretStore for KeychainStore {
     fn get(&self, key: &str) -> Option<String> {
-        let entry = keyring::Entry::new(KEYCHAIN_SERVICE, key).ok()?;
+        if let Some(v) = self.memory.get(key) {
+            return Some(v);
+        }
+        let entry = keyring::Entry::new(self.service, key).ok()?;
         match entry.get_password() {
             Ok(v) if !v.is_empty() => Some(v),
             Ok(_) | Err(keyring::Error::NoEntry) => None,
             Err(e) => {
-                log::warn!("keychain read failed for {key}: {e}");
+                self.warn_once("read", key, &e);
                 None
             }
         }
     }
+    /// `false` when the value is only held in memory (callers may keep a non-secret copy elsewhere).
     fn set(&self, key: &str, value: &str) -> bool {
-        match keyring::Entry::new(KEYCHAIN_SERVICE, key).and_then(|e| e.set_password(value)) {
-            Ok(()) => true,
+        match keyring::Entry::new(self.service, key).and_then(|e| e.set_password(value)) {
+            Ok(()) => {
+                self.memory.delete(key);
+                true
+            }
             Err(e) => {
-                log::warn!("keychain write failed for {key}: {e}");
+                self.warn_once("write", key, &e);
+                self.memory.set(key, value);
                 false
             }
         }
     }
     fn delete(&self, key: &str) {
-        if let Ok(e) = keyring::Entry::new(KEYCHAIN_SERVICE, key) {
+        self.memory.delete(key);
+        if let Ok(e) = keyring::Entry::new(self.service, key) {
             let _ = e.delete_credential();
         }
     }
@@ -225,6 +260,7 @@ impl Auth {
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+        // The device id is not a secret; keep a file copy when the keychain only held it in memory.
         if !self.store.set(DEVICE_KEY, &id) {
             let _ = std::fs::create_dir_all(config::data_dir());
             let _ = std::fs::write(&file, &id);

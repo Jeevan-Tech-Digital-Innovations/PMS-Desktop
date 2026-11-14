@@ -160,6 +160,8 @@ pub struct AppInfo {
     pub platform: String,
     pub api_url: String,
     pub dev: bool,
+    /// `"x11"` / `"wayland"` on Linux, `None` elsewhere.
+    pub linux_session: Option<String>,
 }
 
 pub mod events {
