@@ -1,0 +1,107 @@
+name: Desktop build
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Checks (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Frontend tests
+        run: npm test
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Rust clippy
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+
+  build:
+    name: Build (${{ matrix.name }})
+    needs: checks
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows
+            os: windows-latest
+            args: --bundles nsis
+            rust-targets: ""
+            artifact: pms-desktop-windows-nsis
+            bundle-path: src-tauri/target/**/release/bundle/nsis/*.exe
+          - name: macos
+            os: macos-latest
+            args: --target universal-apple-darwin
+            rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
+            artifact: pms-desktop-macos-dmg
+            bundle-path: src-tauri/target/**/release/bundle/dmg/*.dmg
+    env:
+      # Compile-time defaults for the app (read with option_env! in Rust).
+      # Set repository variables to override; the fallbacks are the staging hosts.
+      PMS_API_URL: ${{ vars.PMS_API_URL || 'https://stagingapi.enjev.com/api/v1' }}
+      AXIS_API_URL: ${{ vars.AXIS_API_URL || 'https://stagingaxisapi.enjev.com' }}
+      PMS_WEB_URL: ${{ vars.PMS_WEB_URL || 'https://stagingpms.enjev.com' }}
+      # Optional. Only used if updater signing is enabled; the build does not need them.
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-targets }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # Builds only. No tagName, so no GitHub release is created or published.
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        with:
+          projectPath: .
+          args: ${{ matrix.args }}
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.bundle-path }}
+          if-no-files-found: error
+          retention-days: 14
