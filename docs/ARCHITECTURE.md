@@ -67,13 +67,14 @@ Response shapes: see `legacy-electron/src/renderer/src/pages/**/**Api.services.t
 | Today totals | `GET /tasks/time-logs/accumulated-today`, `/accumulated-break-today`, `/tasks/{taskId}/time-logs/accumulated-today` |
 | Recent tasks | `GET /tasks/time-logs` (latest distinct tasks) |
 | Heartbeat (**required**: server ends timers with no heartbeat for 15 min) | `PUT /tasks/time-logs/{timeLogId}/heartbeat` every 30 s |
-| Breaks | `GET /breaks/reasons`, `POST /tasks/time-logs/{timeLogId}/breaks/start` `{reasonId}`, `PUT /tasks/time-logs/{timeLogId}/breaks/stop` |
-| Idle note | `POST /tasks/time-logs/{timeLogId}/notes` |
+| Breaks | `GET /breaks/reasons`, `POST /tasks/time-logs/{timeLogId}/breaks/start` `{breakReasonId}`, `PUT /tasks/time-logs/{timeLogId}/breaks/stop` |
+| Idle note | `POST /tasks/time-logs/{timeLogId}/notes` `{noteText}` (1–120 chars) |
 | Screenshot | `POST /screenshots/upload/{timeLogId}` multipart: `file` (JPEG), `capturedAt`, `keyboardActivityPercent`, `mouseActivityPercent`, `activeWindowTitle` |
 | App usage | `POST /activity/apps/bulk` `[{appName, url, startTime, endTime, durationSeconds, timeLogId}]` |
 
 **Times sent to the API**: ISO-8601 **with offset** (e.g. `2026-11-14T18:04:00+05:30`). The API is being changed to accept
-offsets and convert to IST; until that lands it also accepts local `YYYY-MM-DDTHH:mm:ss`. One helper (`time::api_ts`) owns this.
+offsets and convert to IST; until that lands it also accepts local `YYYY-MM-DDTHH:mm:ss`. One helper (`time::api_ts`) owns this
+(`time::SEND_OFFSET` switches formats). Times the API *returns* (`startTime`, …) have no offset and are IST wall time.
 
 **App usage fields (fixes the Chrome grouping bug):** `appName` is always the **program** (from the OS process: e.g.
 `Google Chrome`, `Microsoft Edge`, `Visual Studio Code`, `Microsoft Excel`), never a window title. `url` is the window title
@@ -164,6 +165,8 @@ type TimerSnapshot = {
 - Offline queue: screenshots and app-usage batches are written to `<app data>/queue/` and retried with backoff
   (5 s → 5 min); cap 500 MB / 7 days; heartbeats are not queued.
 - Employee settings: cached 15 min.
+- Screenshots, app usage, activity samples and idle detection run only in `working`. Work time accrues in `working` and
+  `paused` (the server counts `PRODUCTIVE_PAUSE` as productive), break time in `break`, nothing in `away` / `idle`.
 
 ## 8. Tracking mode
 
