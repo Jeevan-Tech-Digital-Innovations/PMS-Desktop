@@ -24,8 +24,12 @@ count time or hold credentials.
 | Framework | Tauri 2 (`tauri` 2) with `tauri-build` |
 | Language | Rust, edition 2024 |
 | Core modules | `config`, `auth`, `api`, `timer`, `tracker` (idle, screenshot, apps, power), `queue`, `settings`, `tray`, `commands` |
-| Secure storage | OS keychain via the `keyring` crate (refresh token and device id) |
-| Packaging | Windows NSIS installer (per-user, WebView2 bootstrapper); macOS `.dmg`, universal binary |
+| Platforms | Windows 10/11 and Ubuntu 22.04+ (macOS code still compiles; not shipped) |
+| Secure storage | OS keychain via the `keyring` crate (refresh token and device id): Windows Credential Manager, Linux Secret Service (`sync-secret-service` + `crypto-rust`; in-memory only if unavailable) |
+| Linux desktop queries | `dbus` (GNOME Mutter idle time, GNOME ScreenSaver / logind lock state) and `x11rb` (X11 XScreenSaver idle time) |
+| Screenshots / active window | `xcap` (X11, Wayland portal, Windows) and `active-win-pos-rs` |
+| Packaging | Windows NSIS installer (per-user, WebView2 bootstrapper); Ubuntu `.deb` and `.AppImage` |
+| Channels | Staging and production: `tauri.staging.conf.json` overlay (product name, identifier, binary name) plus compiled-in URLs |
 
 Module layout and the command and event contract are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -45,7 +49,8 @@ Module layout and the command and event contract are in [docs/ARCHITECTURE.md](d
 |---|---|
 | Node | 22 (`npm ci`) |
 | Rust | stable toolchain; `swatinem/rust-cache` |
-| CI | GitHub Actions, `.github/workflows/desktop-build.yml`: typecheck, tests, `cargo test`, `cargo clippy -D warnings`, then installer builds |
-| Installer builds | `tauri-apps/tauri-action@v0`, no release published; artifacts uploaded |
-| Code signing | None. Windows installers show the SmartScreen prompt; macOS needs first-launch approval. See [docs/INSTALL.md](docs/INSTALL.md). |
-| Config | Compile-time via `option_env!`: `PMS_API_URL`, `AXIS_API_URL`, `PMS_WEB_URL` |
+| CI | GitHub Actions, `.github/workflows/desktop-build.yml`: checks on Windows (typecheck, frontend tests, `cargo test`, `cargo clippy --all-targets -D warnings`) and Ubuntu 22.04 (`cargo test`, clippy), a read-only self-test against staging on Windows, then installer builds |
+| Installer builds | `desktop-bundle.yml` (reusable): `tauri-apps/tauri-action@v0` for Windows (NSIS) and Ubuntu 22.04 (deb, AppImage); artifacts on every run; GitHub Releases on pushes to `build/staging` (staging pre-release) and `main` (production) |
+| CI secrets | `PMS_STAGING_TEST_EMAIL`, `PMS_STAGING_TEST_PASSWORD` (self-test; skipped when unset) |
+| Code signing | None. Windows installers show the SmartScreen prompt. See [docs/INSTALL.md](docs/INSTALL.md). |
+| Config | Compile-time via `option_env!`: `PMS_API_URL`, `AXIS_API_URL`, `PMS_WEB_URL` (set per channel by CI); identifier and product name from `build.rs` |

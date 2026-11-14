@@ -2,8 +2,12 @@
 
 ```
 PMS-Desktop/
-├── .github/workflows/
-│   └── desktop-build.yml      CI: checks on Windows, installer builds (Windows NSIS, macOS universal DMG)
+├── .github/
+│   ├── scripts/
+│   │   └── install-linux-deps.sh  Ubuntu build packages (CI and developers)
+│   └── workflows/
+│       ├── desktop-build.yml  CI: checks (Windows, Ubuntu), staging self-test, builds and releases per channel
+│       └── desktop-bundle.yml reusable: Windows NSIS + Ubuntu deb/AppImage, optional GitHub Release
 ├── docs/
 │   ├── ARCHITECTURE.md        app design, config, command and event contract, tracking rules
 │   └── INSTALL.md             installing for employees and IT
@@ -16,8 +20,10 @@ PMS-Desktop/
 │   ├── src/
 │   │   ├── lib.rs             app setup: plugins, tray, command registration
 │   │   └── main.rs            binary entry point
+│   ├── build.rs               Tauri build script; compiles in the identifier and product name
 │   ├── Cargo.toml             Rust dependencies
-│   └── tauri.conf.json        window, bundle (NSIS, DMG) and build settings
+│   ├── tauri.conf.json        window, bundle (NSIS, deb, AppImage) and build settings (production identity)
+│   └── tauri.staging.conf.json  overlay for staging builds: name, identifier, binary name
 ├── index.html                 Vite entry page
 ├── package.json               npm scripts: dev, build, typecheck, test, check
 ├── tsconfig.json              TypeScript config for the frontend
@@ -37,7 +43,7 @@ These are the planned modules from [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | `auth.rs` | Axis sign-in, token refresh, sign-out, company switch, keychain |
 | `api.rs` | PMS-API client; the access token stays here |
 | `timer.rs` | Timer state machine, heartbeat, active-timer poll, overtime |
-| `tracker/` | `idle.rs`, `screenshot.rs`, `apps.rs`, `power.rs` (sleep and lock) |
+| `tracker/` | `idle.rs`, `screenshot.rs`, `apps.rs`, `power.rs` (sleep and lock), `linux.rs` (X11 / D-Bus queries) |
 | `queue.rs` | Offline queue on disk with backoff |
 | `settings.rs` | Employee tracking settings cache (15 min) |
 | `tray.rs` | Tray menu and state icons |
@@ -52,4 +58,4 @@ from the PMS design tokens, which define both light and dark themes. The fronten
 ## Build outputs (git-ignored)
 
 - `dist/`: Vite build output, loaded by the Tauri window in release builds
-- `src-tauri/target/`: Rust build output; installers are in `src-tauri/target/release/bundle/` (or `.../<target>/release/bundle/` for universal macOS builds)
+- `src-tauri/target/`: Rust build output; installers are in `src-tauri/target/release/bundle/` (`nsis/`, `deb/`, `appimage/`)
