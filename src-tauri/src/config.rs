@@ -6,8 +6,13 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-pub const APP_IDENTIFIER: &str = "com.jeevantech.pms.desktop";
-pub const KEYCHAIN_SERVICE: &str = "com.jeevantech.pms.desktop";
+/// Tauri `identifier` of this build (`com.jeevantech.pms.desktop`, or `….staging` for the staging channel), set by
+/// build.rs from tauri.conf.json plus any `--config` overlay.
+pub const APP_IDENTIFIER: &str = env!("PMS_APP_IDENTIFIER");
+/// Keychain service name: the identifier, so staging and production keep separate sessions.
+pub const KEYCHAIN_SERVICE: &str = APP_IDENTIFIER;
+/// Tauri `productName` of this build ("PMS Desktop" or "PMS Desktop Staging").
+pub const PRODUCT_NAME: &str = env!("PMS_PRODUCT_NAME");
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Debug builds default to a local PMS-API; release builds default to staging unless CI bakes in another URL.
@@ -214,6 +219,13 @@ mod tests {
         if !cfg!(target_os = "linux") {
             assert_eq!(linux_session(), None);
         }
+    }
+
+    #[test]
+    fn keychain_service_follows_identifier() {
+        assert_eq!(KEYCHAIN_SERVICE, APP_IDENTIFIER);
+        assert!(APP_IDENTIFIER.starts_with("com.jeevantech.pms.desktop"));
+        assert!(data_dir().ends_with(APP_IDENTIFIER));
     }
 
     #[test]
