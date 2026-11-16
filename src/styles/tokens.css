@@ -1,0 +1,166 @@
+/*
+ * PMS design tokens, ported from PMS-UI/src/theme/tokens.ts.
+ * Accent is JTDI teal #007b88; in dark mode it is lifted until it reads on the surface
+ * (same algorithm as accentSet() in tokens.ts). Components use these variables only.
+ */
+:root {
+  color-scheme: light dark;
+
+  /* Surfaces and text */
+  --c-bg: #f5f5f7;
+  --c-surface: #ffffff;
+  --c-surface-2: #f7f8fa;
+  --c-surface-3: #eef0f3;
+  --c-elevated: #ffffff;
+  --c-mask: rgba(17, 20, 24, 0.4);
+  --c-text: #1d1d1f;
+  --c-text-2: #3a3a3f;
+  --c-text-3: #6e6e73;
+  --c-text-4: #8e8e93;
+  --c-text-disabled: #b8b8bd;
+  --c-border: #e5e5ea;
+  --c-border-strong: #d1d1d6;
+  --c-divider: #ededf0;
+
+  /* Accent */
+  --c-accent: #007b88;
+  --c-accent-hover: #006c78;
+  --c-accent-active: #00606a;
+  --c-accent-soft: #e6f2f3;
+  --c-accent-ring: rgba(0, 123, 136, 0.28);
+  --c-text-on-accent: #ffffff;
+
+  /* Hues: base, soft (background), dark (text on soft) */
+  --c-red: #e5484d;
+  --c-red-soft: #fdecec;
+  --c-red-dark: #b4232a;
+  --c-orange: #f76b15;
+  --c-orange-soft: #ffefe3;
+  --c-orange-dark: #a84a0c;
+  --c-yellow: #e8a400;
+  --c-yellow-soft: #fff5d6;
+  --c-yellow-dark: #7f5a00;
+  --c-green: #30a46c;
+  --c-green-soft: #e6f6ec;
+  --c-green-dark: #1b7046;
+  --c-blue: #2f6fed;
+  --c-blue-soft: #e7efff;
+  --c-blue-dark: #1d54c0;
+  --c-grey: #8b8d98;
+  --c-grey-soft: #eff0f3;
+  --c-grey-dark: #4f525b;
+
+  /* Status */
+  --c-success: var(--c-green);
+  --c-success-soft: var(--c-green-soft);
+  --c-success-dark: var(--c-green-dark);
+  --c-warning: var(--c-orange);
+  --c-warning-soft: var(--c-orange-soft);
+  --c-warning-dark: var(--c-orange-dark);
+  --c-error: var(--c-red);
+  --c-error-soft: var(--c-red-soft);
+  --c-error-dark: var(--c-red-dark);
+  --c-info: var(--c-blue);
+  --c-info-soft: var(--c-blue-soft);
+  --c-info-dark: var(--c-blue-dark);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 4px 14px rgba(16, 24, 40, 0.08);
+  --shadow-lg: 0 14px 36px rgba(16, 24, 40, 0.14);
+  --shadow-focus: 0 0 0 3px var(--c-accent-ring);
+
+  /* Type */
+  --font-sans: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --fs-2xs: 10px;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-base: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 18px;
+  --fs-2xl: 20px;
+  --fs-3xl: 24px;
+  --fs-display: 30px;
+  --fs-timer: 44px;
+
+  /* Spacing */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+
+  /* Shape and motion */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-med: 200ms;
+
+  /* Layers */
+  --z-sticky: 10;
+  --z-floating: 50;
+  --z-overlay: 500;
+  --z-toast: 1000;
+
+  /* Layout */
+  --header-h: 52px;
+  --tap: 44px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --c-bg: #0e0e10;
+    --c-surface: #1c1c1e;
+    --c-surface-2: #232326;
+    --c-surface-3: #2c2c2f;
+    --c-elevated: #242427;
+    --c-mask: rgba(0, 0, 0, 0.6);
+    --c-text: #f5f5f7;
+    --c-text-2: #d4d4d9;
+    --c-text-3: #9e9ea4;
+    --c-text-4: #76767c;
+    --c-text-disabled: #505055;
+    --c-border: #343437;
+    --c-border-strong: #46464a;
+    --c-divider: #2a2a2d;
+
+    --c-accent: #3395a0;
+    --c-accent-hover: #50a4ad;
+    --c-accent-active: #64aeb7;
+    --c-accent-soft: #213438;
+    --c-accent-ring: rgba(51, 149, 160, 0.4);
+    --c-text-on-accent: #ffffff;
+
+    --c-red: #ff6369;
+    --c-red-soft: #3b1418;
+    --c-red-dark: #ff9a96;
+    --c-orange: #ff8b3e;
+    --c-orange-soft: #35200d;
+    --c-orange-dark: #ffad73;
+    --c-yellow: #ffc53d;
+    --c-yellow-soft: #322508;
+    --c-yellow-dark: #f5d47a;
+    --c-green: #3dd68c;
+    --c-green-soft: #122d20;
+    --c-green-dark: #7ee0ad;
+    --c-blue: #70a9ff;
+    --c-blue-soft: #12243f;
+    --c-blue-dark: #a3c6ff;
+    --c-grey: #a3a6ad;
+    --c-grey-soft: #2a2b2e;
+    --c-grey-dark: #c9ccd1;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+    --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+  }
+}

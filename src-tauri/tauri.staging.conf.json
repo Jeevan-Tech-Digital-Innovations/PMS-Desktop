@@ -1,0 +1,6 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "PMS Desktop Staging",
+  "mainBinaryName": "pms-desktop-staging",
+  "identifier": "com.jeevantech.pms.desktop.staging"
+}

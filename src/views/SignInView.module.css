@@ -1,0 +1,87 @@
+.view {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--sp-6);
+  height: 100%;
+  padding: var(--sp-6);
+  background: var(--c-bg);
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+  text-align: center;
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--sp-2);
+  border-radius: var(--radius-lg);
+  background: var(--c-accent);
+  color: var(--c-text-on-accent);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--fs-3xl);
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--c-text-3);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.field input {
+  height: 40px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font-size: var(--fs-base);
+  font-weight: 400;
+}
+
+.field input:focus {
+  border-color: var(--c-accent);
+  box-shadow: var(--shadow-focus);
+  outline: none;
+}
+
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  background: var(--c-error-soft);
+  color: var(--c-error-dark);
+  font-size: var(--fs-md);
+}
+
+.error svg {
+  flex: none;
+  margin-top: 1px;
+}
