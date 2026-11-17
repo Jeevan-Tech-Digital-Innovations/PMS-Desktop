@@ -40,3 +40,6 @@ screenshots/
 # Tauri
 src-tauri/target/
 src-tauri/gen/schemas/
+
+# Written by CI for signed builds (public updater key, createUpdaterArtifacts)
+src-tauri/tauri.updater.conf.json
