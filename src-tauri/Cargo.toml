@@ -44,6 +44,10 @@ fastrand = "2"
 log = "0.4"
 iana-time-zone = "0.1"
 
+[target.'cfg(unix)'.dependencies]
+# SIGTERM (log-out, `kill`) stops the timer before the process ends.
+tokio = { version = "1", features = ["signal"] }
+
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 # Screenshots on Windows (and macOS for development). Linux captures X11 directly (tracker/linux.rs): xcap pulls in
 # PipeWire bindings that need a newer PipeWire than Ubuntu 22.04 ships.

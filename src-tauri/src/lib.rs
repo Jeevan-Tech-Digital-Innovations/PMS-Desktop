@@ -1,5 +1,6 @@
 //! PMS Desktop 2: Rust core. Contract with the React screen: docs/ARCHITECTURE.md.
 
+pub mod alive;
 pub mod api;
 pub mod app;
 pub mod auth;
@@ -22,6 +23,7 @@ pub mod ui;
 
 use std::sync::Arc;
 
+use app::Core;
 use tauri::{Manager, RunEvent, WindowEvent};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -30,7 +32,8 @@ pub fn run() {
     let core = app::Core::new(cfg, Arc::new(auth::KeychainStore::new()));
     let setup_core = core.clone();
 
-    tauri::Builder::default()
+    let context = tauri::generate_context!();
+    let builder = tauri::Builder::default()
         // Must be the first plugin: a second launch just focuses the running window.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| tray::show_window(app)))
         .plugin(tauri_plugin_log::Builder::new().level(log::LevelFilter::Info).build())
@@ -38,7 +41,8 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_positioner::init())
-        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None));
+    builder
         .manage(core)
         .invoke_handler(tauri::generate_handler![
             commands::get_session,
@@ -105,12 +109,20 @@ pub fn run() {
             });
             Ok(())
         })
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while building PMS Desktop")
-        .run(|_app, event| {
+        .run(|app, event| match event {
             // Keep running in the tray when no window is visible; explicit `exit(code)` still quits.
-            if let RunEvent::ExitRequested { code: None, api, .. } = event {
-                api.prevent_exit();
+            RunEvent::ExitRequested { code: None, api, .. } => api.prevent_exit(),
+            // Last chance to stop a running timer. On Windows, tao turns WM_ENDSESSION (shutdown, restart, log-off)
+            // into this event on the UI thread, then ends the process as soon as we return, so the stop is one
+            // blocking HTTP call under a hard budget (`Core::stop_on_exit`). A no-op when no timer is running,
+            // which is also the case after "Quit" (it stops the timer first).
+            RunEvent::Exit => {
+                if let Some(core) = app.try_state::<Arc<Core>>() {
+                    core.stop_on_exit(app::EXIT_STOP_BUDGET);
+                }
             }
+            _ => {}
         });
 }

@@ -2,14 +2,43 @@
 //! than 30 s means the machine slept; lock comes from the OS where available (Windows input desktop, Linux
 //! GNOME ScreenSaver / systemd-logind over D-Bus).
 
+use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 
 pub const SLEEP_JUMP: Duration = Duration::from_secs(30);
 
+/// Sleeping at least this long stops the timer on wake, ended at the moment sleep began (docs/ARCHITECTURE.md
+/// section 6). Shorter sleeps only pause capture and re-check the active timer. `PMS_DEV_FAST` shortens it
+/// (`config::Timings`).
+pub const SLEEP_STOP_AFTER: Duration = Duration::from_secs(5 * 60);
+
+/// Exact start of the latest sleep, when the OS told us (Linux: logind `PrepareForSleep(true)`).
+static SLEEP_MARK: Mutex<Option<SystemTime>> = Mutex::new(None);
+
+/// Record the moment the OS announced sleep. Used only to refine [`PowerWatch`]'s clock-jump detection.
+pub fn note_sleep_started(at: SystemTime) {
+    *SLEEP_MARK.lock().unwrap_or_else(|p| p.into_inner()) = Some(at);
+}
+
+fn take_sleep_mark() -> Option<SystemTime> {
+    SLEEP_MARK.lock().unwrap_or_else(|p| p.into_inner()).take()
+}
+
+/// When sleep began: the OS-reported time if it lies between the last two checks, else the last check before the
+/// clock jumped (at most one check period early). Pure.
+pub fn sleep_began(prev: SystemTime, now: SystemTime, reported: Option<SystemTime>) -> SystemTime {
+    reported.filter(|r| *r >= prev && *r <= now).unwrap_or(prev)
+}
+
+/// The moment to end the timer at after a sleep of `slept`, or `None` when it was short enough to keep going. Pure.
+pub fn sleep_stop_at(slept: Duration, began: SystemTime, stop_after: Duration) -> Option<SystemTime> {
+    (slept >= stop_after).then_some(began)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PowerEvent {
-    /// Woke up after sleeping for about this long.
-    Woke(Duration),
+    /// Woke up after sleeping for about `gap`; sleep began at `began`.
+    Woke { gap: Duration, began: SystemTime },
     Locked,
     Unlocked,
 }
@@ -35,7 +64,8 @@ impl PowerWatch {
         let mut out = Vec::new();
         let now = SystemTime::now();
         if let Some(gap) = Self::slept(self.last_wall, now, self.expected) {
-            out.push(PowerEvent::Woke(gap));
+            let began = sleep_began(self.last_wall, now, take_sleep_mark());
+            out.push(PowerEvent::Woke { gap, began });
         }
         self.last_wall = now;
         if let Some(locked) = session_locked()
@@ -92,5 +122,36 @@ mod tests {
         assert_eq!(PowerWatch::slept(t0, t0 + Duration::from_secs(605), p), Some(Duration::from_secs(600)));
         // Clock going backwards is not sleep.
         assert_eq!(PowerWatch::slept(t0, t0 - Duration::from_secs(100), p), None);
+    }
+
+    #[test]
+    fn sleep_start_prefers_the_os_time_inside_the_window() {
+        let t0 = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000);
+        let now = t0 + Duration::from_secs(900);
+        assert_eq!(sleep_began(t0, now, None), t0);
+        let exact = t0 + Duration::from_secs(3);
+        assert_eq!(sleep_began(t0, now, Some(exact)), exact);
+        // A stale mark from an earlier sleep, or one from the future, is ignored.
+        assert_eq!(sleep_began(t0, now, Some(t0 - Duration::from_secs(60))), t0);
+        assert_eq!(sleep_began(t0, now, Some(now + Duration::from_secs(1))), t0);
+    }
+
+    #[test]
+    fn long_sleep_stops_at_sleep_start_short_sleep_does_not() {
+        let began = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000);
+        let five = SLEEP_STOP_AFTER;
+        assert_eq!(sleep_stop_at(five - Duration::from_secs(1), began, five), None);
+        assert_eq!(sleep_stop_at(five, began, five), Some(began));
+        assert_eq!(sleep_stop_at(Duration::from_secs(3 * 3600), began, five), Some(began));
+        // The dev-fast threshold is shorter.
+        assert_eq!(sleep_stop_at(Duration::from_secs(61), began, Duration::from_secs(60)), Some(began));
+    }
+
+    #[test]
+    fn mark_is_used_once() {
+        let t0 = SystemTime::UNIX_EPOCH + Duration::from_secs(2_000_000);
+        note_sleep_started(t0);
+        assert_eq!(take_sleep_mark(), Some(t0));
+        assert_eq!(take_sleep_mark(), None);
     }
 }
