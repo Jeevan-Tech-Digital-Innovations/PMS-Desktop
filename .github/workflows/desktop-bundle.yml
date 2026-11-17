@@ -3,6 +3,15 @@ name: Desktop bundle
 # Called by desktop-build.yml. Builds the Windows (NSIS) and Ubuntu (deb, AppImage) installers for one channel,
 # uploads them as artifacts and, with `release: true`, publishes them as a GitHub Release. The token's
 # permissions come from the calling job (contents: write only for releases).
+#
+# Releases go to the PUBLIC repository Jeevan-Tech-Digital-Innovations/PMS-Desktop-Releases (override with the
+# repository variable RELEASES_REPO) when the secret RELEASES_REPO_TOKEN (fine-grained PAT, contents: write on
+# that repo) exists; without it they go to this repository as before. The installed apps update from there:
+# - production: tag desktop-v<version>, the "latest" release, latest.json at releases/latest/download/
+# - staging: ONE moving pre-release, tag desktop-staging, deleted and recreated on every staging release so
+#   releases/download/desktop-staging/latest.json is a stable URL
+# Update packages are signed and latest.json is uploaded only when the secrets TAURI_SIGNING_PRIVATE_KEY (+
+# _PASSWORD) and the variable/secret UPDATER_PUBKEY exist (README "Auto-update").
 on:
   workflow_call:
     inputs:
@@ -16,8 +25,33 @@ on:
         default: false
 
 jobs:
+  # Staging only, once, before the matrix: the moving `desktop-staging` release is deleted (with its tag) and
+  # recreated empty. Doing this inside the matrix would let the second leg delete the first leg's files.
+  prepare-release:
+    name: Prepare staging release
+    if: inputs.release && inputs.channel == 'staging'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+      RELEASES_REPO: ${{ vars.RELEASES_REPO || 'Jeevan-Tech-Digital-Innovations/PMS-Desktop-Releases' }}
+    steps:
+      - name: Recreate the desktop-staging release
+        shell: bash
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice title=Staging release stays in this repository::RELEASES_REPO_TOKEN is not set, so the staging release is published here as desktop-staging-v<version>-<run> and the staging updater has nothing to read."
+            exit 0
+          fi
+          gh release delete desktop-staging --repo "$RELEASES_REPO" --cleanup-tag --yes || echo "no previous desktop-staging release"
+          gh release create desktop-staging --repo "$RELEASES_REPO" --prerelease \
+            --title "PMS Desktop Staging" \
+            --notes "Moving pre-release: always the latest staging build. The staging app updates from latest.json here."
+
   bundle:
     name: ${{ matrix.name }} (${{ inputs.channel }})
+    needs: prepare-release
+    # prepare-release is skipped for production and for builds that do not release.
+    if: ${{ !cancelled() && (needs.prepare-release.result == 'success' || needs.prepare-release.result == 'skipped') }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -36,9 +70,14 @@ jobs:
               src-tauri/target/**/release/bundle/appimage/*.AppImage
     env:
       CHANNEL: ${{ inputs.channel }}
-      # Optional. Only used if updater signing is enabled; the build does not need them.
+      # Update signing (optional, see the header): without them the installers still build, just not auto-updating.
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      # The public key is not secret: a repository variable is fine, a secret works too. Compiled into the app.
+      UPDATER_PUBKEY: ${{ vars.UPDATER_PUBKEY || secrets.UPDATER_PUBKEY }}
+      RELEASES_REPO_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+      RELEASES_REPO: ${{ vars.RELEASES_REPO || 'Jeevan-Tech-Digital-Innovations/PMS-Desktop-Releases' }}
+      RELEASES_BRANCH: ${{ vars.RELEASES_REPO_BRANCH || 'main' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -55,12 +94,15 @@ jobs:
           API_PRODUCTION: ${{ vars.PMS_API_URL_PRODUCTION || 'https://pmsapi.enjev.com/api/v1' }}
           AXIS_PRODUCTION: ${{ vars.AXIS_API_URL_PRODUCTION || 'https://axisapi.enjev.com' }}
           WEB_PRODUCTION: ${{ vars.PMS_WEB_URL_PRODUCTION || 'https://pms.enjev.com' }}
+          UPDATER_ENDPOINT_STAGING: ${{ vars.UPDATER_ENDPOINT_STAGING }}
+          UPDATER_ENDPOINT_PRODUCTION: ${{ vars.UPDATER_ENDPOINT_PRODUCTION }}
           RUN_NUMBER: ${{ github.run_number }}
         run: |
           case "$CHANNEL" in
             production)
               api="$API_PRODUCTION"; axis="$AXIS_PRODUCTION"; web="$WEB_PRODUCTION"
               config_args=""
+              updater_endpoint="${UPDATER_ENDPOINT_PRODUCTION:-https://github.com/$RELEASES_REPO/releases/latest/download/latest.json}"
               tag="desktop-v__VERSION__"
               name="PMS Desktop v__VERSION__"
               prerelease=false
@@ -68,16 +110,41 @@ jobs:
             staging)
               api="$API_STAGING"; axis="$AXIS_STAGING"; web="$WEB_STAGING"
               config_args="--config src-tauri/tauri.staging.conf.json"
+              updater_endpoint="${UPDATER_ENDPOINT_STAGING:-https://github.com/$RELEASES_REPO/releases/download/desktop-staging/latest.json}"
               tag="desktop-staging-v__VERSION__-$RUN_NUMBER"
               name="PMS Desktop Staging v__VERSION__ (build $RUN_NUMBER)"
               prerelease=true
+              # With the public releases repository, staging is one moving pre-release (see prepare-release).
+              if [ -n "$RELEASES_REPO_TOKEN" ]; then
+                tag="desktop-staging"
+              fi
               ;;
             *)
               echo "::error::Unknown channel '$CHANNEL' (expected staging or production)"
               exit 1
               ;;
           esac
+          # Where to release: the public repository with its own token, else this repository.
+          if [ -n "$RELEASES_REPO_TOKEN" ]; then
+            release_owner="${RELEASES_REPO%%/*}"
+            release_repo="${RELEASES_REPO#*/}"
+            release_commitish="$RELEASES_BRANCH"
+          else
+            release_owner=""; release_repo=""; release_commitish=""
+          fi
+          # Signed update packages need the private key and the public key together.
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ] && [ -n "$UPDATER_PUBKEY" ]; then
+            updater_signing=true
+          else
+            updater_signing=false
+            echo "::notice title=Auto-update off::TAURI_SIGNING_PRIVATE_KEY and UPDATER_PUBKEY are not both set: installers are built without update packages."
+          fi
           {
+            echo "UPDATER_ENDPOINT=$updater_endpoint"
+            echo "UPDATER_SIGNING=$updater_signing"
+            echo "RELEASE_OWNER=$release_owner"
+            echo "RELEASE_REPO=$release_repo"
+            echo "RELEASE_COMMITISH=$release_commitish"
             echo "PMS_API_URL=$api"
             echo "AXIS_API_URL=$axis"
             echo "PMS_WEB_URL=$web"
@@ -100,6 +167,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Signed builds: also produce the update packages (+ .sig) and give the updater plugin its public key and
+      # endpoint. The overlay is generated, not committed (it holds the key); the app compiles the same key in.
+      - name: Updater config
+        if: env.UPDATER_SIGNING == 'true'
+        shell: bash
+        run: |
+          node -e "require('fs').writeFileSync('src-tauri/tauri.updater.conf.json', JSON.stringify({ bundle: { createUpdaterArtifacts: true }, plugins: { updater: { pubkey: process.env.UPDATER_PUBKEY.trim(), endpoints: [process.env.UPDATER_ENDPOINT] } } }))"
+          echo "TAURI_CONFIG_ARGS=$TAURI_CONFIG_ARGS --config src-tauri/tauri.updater.conf.json" >> "$GITHUB_ENV"
+
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: swatinem/rust-cache@v2
@@ -111,9 +187,14 @@ jobs:
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A token for the public releases repository when there is one, else this repository's own.
+          GITHUB_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN || secrets.GITHUB_TOKEN }}
         with:
           projectPath: .
+          owner: ${{ env.RELEASE_OWNER }}
+          repo: ${{ env.RELEASE_REPO }}
+          releaseCommitish: ${{ env.RELEASE_COMMITISH }}
+          uploadUpdaterJson: ${{ env.UPDATER_SIGNING == 'true' }}
           args: --bundles ${{ matrix.bundles }} ${{ env.TAURI_CONFIG_ARGS }}
           tagName: ${{ inputs.release && env.RELEASE_TAG || '' }}
           releaseName: ${{ env.RELEASE_NAME }}
