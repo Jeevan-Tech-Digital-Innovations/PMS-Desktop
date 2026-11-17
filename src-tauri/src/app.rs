@@ -157,6 +157,15 @@ impl Core {
         *lock(&self.pending) = Some(Pending { state, forced: true, reason: None });
     }
 
+    /// Hold the operation lock if nothing else is changing the timer (used by the updater).
+    pub(crate) fn try_lock_op(&self) -> Option<tokio::sync::MutexGuard<'_, ()>> {
+        self.op.try_lock().ok()
+    }
+
+    pub(crate) async fn lock_op(&self) -> tokio::sync::MutexGuard<'_, ()> {
+        self.op.lock().await
+    }
+
     fn first_run_path(&self) -> std::path::PathBuf {
         self.cfg.data_dir.join(FIRST_RUN_FILE)
     }

@@ -20,6 +20,7 @@ pub mod tracker;
 pub mod tray;
 pub mod types;
 pub mod ui;
+pub mod updater;
 
 use std::sync::Arc;
 
@@ -33,6 +34,11 @@ pub fn run() {
     let setup_core = core.clone();
 
     let context = tauri::generate_context!();
+    // The updater plugin needs `plugins.updater` in the config (CI writes it with the public key) and fails to
+    // initialise without it, so it is registered only when both the key and the config are there.
+    let updater_on = !updater::pubkey().is_empty() && context.config().plugins.0.contains_key("updater");
+    updater::set_enabled(updater_on);
+
     let builder = tauri::Builder::default()
         // Must be the first plugin: a second launch just focuses the running window.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| tray::show_window(app)))
@@ -41,7 +47,13 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_positioner::init())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None));
+    let builder = if updater_on {
+        builder.plugin(tauri_plugin_updater::Builder::new().pubkey(updater::pubkey()).build())
+    } else {
+        builder
+    };
     builder
         .manage(core)
         .invoke_handler(tauri::generate_handler![
@@ -96,6 +108,7 @@ pub fn run() {
             core.ui.attach(app.handle().clone());
             tray::create(app.handle())?;
             core.spawn_background();
+            updater::spawn(app.handle().clone(), core.clone());
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 let signed_in = core.startup().await;
