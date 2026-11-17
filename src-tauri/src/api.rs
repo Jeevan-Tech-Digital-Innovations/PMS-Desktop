@@ -106,6 +106,11 @@ fn as_u64(v: Option<Value>) -> u64 {
     }
 }
 
+/// Body of `PUT /tasks/{id}/time-logs/end`: `{"endTime": "<ISO-8601 with offset>"}`, or none to stop now.
+pub fn end_body(end_time: Option<&DateTime<Local>>) -> Option<Value> {
+    end_time.map(|t| json!({ "endTime": time::api_ts(t) }))
+}
+
 fn timezone_name() -> String {
     iana_time_zone::get_timezone().unwrap_or_default()
 }
@@ -258,8 +263,41 @@ impl Api {
         Self::time_log(parse_body(&text)?)
     }
 
-    pub async fn end(&self, task_id: i64) -> AppResult<()> {
-        self.put(&format!("/tasks/{task_id}/time-logs/end"), None).await.map(|_| ())
+    /// Stop the running log of a task. `end_time`: when the work really ended (ISO-8601 with offset in the body);
+    /// `None` stops at "now" on the server. An API that ignores `endTime` still stops the log, at now.
+    pub async fn end(&self, task_id: i64, end_time: Option<DateTime<Local>>) -> AppResult<()> {
+        self.put(&format!("/tasks/{task_id}/time-logs/end"), end_body(end_time.as_ref())).await.map(|_| ())
+    }
+
+    /// The stop sent while the OS is shutting down, from a plain thread (blocking). It deliberately shares nothing
+    /// with the app: no tokio runtime of ours (its workers may be stuck waiting for the blocked UI thread), no
+    /// `op` lock (a poll can hold it for 45 s), no token refresh. One request with its own short timeout.
+    pub fn end_standalone(&self, token: &str, task_id: i64, end_time: DateTime<Local>, timeout: Duration) -> AppResult<()> {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|e| AppError::server(e.to_string()))?;
+        let url = self.url(&format!("/tasks/{task_id}/time-logs/end"));
+        let body = end_body(Some(&end_time));
+        rt.block_on(async {
+            let http = reqwest::Client::builder()
+                .user_agent(config::user_agent())
+                .connect_timeout(timeout)
+                .timeout(timeout)
+                .build()
+                .map_err(|e| AppError::server(e.to_string()))?;
+            let mut req = http.put(&url).bearer_auth(token);
+            if let Some(b) = &body {
+                req = req.json(b);
+            }
+            let resp = req.send().await.map_err(AppError::from)?;
+            let status = resp.status().as_u16();
+            if (200..300).contains(&status) {
+                Ok(())
+            } else {
+                Err(AppError::from_status(status, &resp.text().await.unwrap_or_default()))
+            }
+        })
     }
 
     pub async fn transition(&self, task_id: i64, state: ServerState, effective: DateTime<Local>) -> AppResult<TimeLog> {
@@ -385,6 +423,56 @@ mod tests {
         assert_eq!(as_u64(Some(json!(42))), 42);
         assert_eq!(as_u64(Some(json!({"data": 7}))), 7);
         assert_eq!(as_u64(None), 0);
+    }
+
+    #[test]
+    fn end_body_carries_the_offset_time() {
+        use chrono::TimeZone;
+        assert_eq!(end_body(None), None);
+        let t = Local.with_ymd_and_hms(2026, 11, 17, 15, 7, 9).unwrap();
+        let b = end_body(Some(&t)).unwrap();
+        let sent = b["endTime"].as_str().unwrap();
+        assert!(sent.starts_with("2026-11-17T15:07:09"), "{sent}");
+        assert_eq!(sent.len(), "2026-11-17T15:07:09+05:30".len());
+    }
+
+    fn test_api(base: String) -> Api {
+        let http = build_client();
+        let auth = Arc::new(Auth::new(http.clone(), "http://127.0.0.1:9".into(), Arc::new(crate::auth::MemoryStore::default())));
+        Api::new(http, base, auth)
+    }
+
+    #[test]
+    fn standalone_end_sends_token_and_end_time() {
+        use std::io::{Read, Write};
+        use chrono::TimeZone;
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://{}/api/v1", l.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let (mut c, _) = l.accept().unwrap();
+            let mut buf = [0u8; 4096];
+            let n = c.read(&mut buf).unwrap();
+            c.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").unwrap();
+            String::from_utf8_lossy(&buf[..n]).to_string()
+        });
+        let t = Local.with_ymd_and_hms(2026, 11, 17, 15, 7, 9).unwrap();
+        test_api(base).end_standalone("tok123", 42, t, Duration::from_secs(3)).unwrap();
+        let req = server.join().unwrap();
+        assert!(req.starts_with("PUT /api/v1/tasks/42/time-logs/end "), "{req}");
+        assert!(req.to_lowercase().contains("authorization: bearer tok123"), "{req}");
+        assert!(req.contains("\"endTime\":\"2026-11-17T15:07:09"), "{req}");
+    }
+
+    #[test]
+    fn standalone_end_gives_up_after_its_timeout() {
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://{}/api/v1", l.local_addr().unwrap());
+        // Accepts (the kernel does) but never answers.
+        let started = std::time::Instant::now();
+        let r = test_api(base).end_standalone("t", 1, Local::now(), Duration::from_millis(400));
+        assert!(r.is_err());
+        assert!(started.elapsed() < Duration::from_secs(3));
+        drop(l);
     }
 
     #[test]

@@ -390,6 +390,11 @@ impl Auth {
         }
     }
 
+    /// The access token as it is, without refreshing or waiting (shutdown path). `None` when signed out.
+    pub fn cached_access_token(&self) -> Option<String> {
+        self.state.read().ok()?.as_ref().map(|s| s.access_token.clone())
+    }
+
     /// Current access token (refreshing 60 s before expiry) and its generation.
     pub async fn access_token(&self) -> AppResult<(String, u64)> {
         let (token, expires_at, generation) = {

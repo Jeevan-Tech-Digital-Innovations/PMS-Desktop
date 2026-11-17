@@ -51,6 +51,8 @@ pub struct Timings {
     pub app_flush: Duration,
     pub activity_sample: Duration,
     pub power_check: Duration,
+    /// Sleep at least this long: stop the timer on wake (`tracker::power::SLEEP_STOP_AFTER`).
+    pub sleep_stop_after: Duration,
     pub settings_ttl: Duration,
     pub web_start_grace: Duration,
 }
@@ -68,6 +70,7 @@ impl Timings {
             app_flush: Duration::from_secs(60),
             activity_sample: Duration::from_secs(10),
             power_check: Duration::from_secs(5),
+            sleep_stop_after: crate::tracker::power::SLEEP_STOP_AFTER,
             settings_ttl: Duration::from_secs(15 * 60),
             web_start_grace: Duration::from_secs(15),
         }
@@ -79,6 +82,7 @@ impl Timings {
             idle_autostop: Duration::from_secs(2 * 60),
             screenshot_override: Some(Duration::from_secs(60)),
             overtime_after: Duration::from_secs(3 * 60),
+            sleep_stop_after: Duration::from_secs(60),
             ..Self::normal()
         }
     }
@@ -236,5 +240,7 @@ mod tests {
         assert_eq!(f.screenshot_override.map(|d| d.as_secs()), Some(60));
         assert_eq!(f.overtime_after.as_secs(), 180);
         assert_eq!(f.heartbeat.as_secs(), 30);
+        assert_eq!(f.sleep_stop_after.as_secs(), 60);
+        assert_eq!(Timings::normal().sleep_stop_after.as_secs(), 300);
     }
 }

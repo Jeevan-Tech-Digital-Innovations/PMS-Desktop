@@ -1,5 +1,6 @@
 //! PMS Desktop 2: Rust core. Contract with the React screen: docs/ARCHITECTURE.md.
 
+pub mod alive;
 pub mod api;
 pub mod app;
 pub mod auth;
@@ -19,9 +20,11 @@ pub mod tracker;
 pub mod tray;
 pub mod types;
 pub mod ui;
+pub mod updater;
 
 use std::sync::Arc;
 
+use app::Core;
 use tauri::{Manager, RunEvent, WindowEvent};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -30,7 +33,13 @@ pub fn run() {
     let core = app::Core::new(cfg, Arc::new(auth::KeychainStore::new()));
     let setup_core = core.clone();
 
-    tauri::Builder::default()
+    let context = tauri::generate_context!();
+    // The updater plugin needs `plugins.updater` in the config (CI writes it with the public key) and fails to
+    // initialise without it, so it is registered only when both the key and the config are there.
+    let updater_on = !updater::pubkey().is_empty() && context.config().plugins.0.contains_key("updater");
+    updater::set_enabled(updater_on);
+
+    let builder = tauri::Builder::default()
         // Must be the first plugin: a second launch just focuses the running window.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| tray::show_window(app)))
         .plugin(tauri_plugin_log::Builder::new().level(log::LevelFilter::Info).build())
@@ -38,7 +47,14 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_positioner::init())
-        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None));
+    let builder = if updater_on {
+        builder.plugin(tauri_plugin_updater::Builder::new().pubkey(updater::pubkey()).build())
+    } else {
+        builder
+    };
+    builder
         .manage(core)
         .invoke_handler(tauri::generate_handler![
             commands::get_session,
@@ -92,6 +108,7 @@ pub fn run() {
             core.ui.attach(app.handle().clone());
             tray::create(app.handle())?;
             core.spawn_background();
+            updater::spawn(app.handle().clone(), core.clone());
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 let signed_in = core.startup().await;
@@ -105,12 +122,20 @@ pub fn run() {
             });
             Ok(())
         })
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while building PMS Desktop")
-        .run(|_app, event| {
+        .run(|app, event| match event {
             // Keep running in the tray when no window is visible; explicit `exit(code)` still quits.
-            if let RunEvent::ExitRequested { code: None, api, .. } = event {
-                api.prevent_exit();
+            RunEvent::ExitRequested { code: None, api, .. } => api.prevent_exit(),
+            // Last chance to stop a running timer. On Windows, tao turns WM_ENDSESSION (shutdown, restart, log-off)
+            // into this event on the UI thread, then ends the process as soon as we return, so the stop is one
+            // blocking HTTP call under a hard budget (`Core::stop_on_exit`). A no-op when no timer is running,
+            // which is also the case after "Quit" (it stops the timer first).
+            RunEvent::Exit => {
+                if let Some(core) = app.try_state::<Arc<Core>>() {
+                    core.stop_on_exit(app::EXIT_STOP_BUDGET);
+                }
             }
+            _ => {}
         });
 }

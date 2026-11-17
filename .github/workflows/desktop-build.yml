@@ -2,8 +2,11 @@ name: Desktop build
 
 # Channels (docs/INSTALL.md "Staging vs production builds"):
 # - pull_request:        checks + staging installers as artifacts, no release
-# - push to build/staging: staging release (prerelease, tag desktop-staging-v<version>-<run>)
-# - push to main:        production release (tag desktop-v<version>)
+# - push to build/staging: staging release. With the RELEASES_REPO_TOKEN secret: the moving pre-release
+#                        `desktop-staging` in the public PMS-Desktop-Releases repository; without it a pre-release
+#                        in this repository (tag desktop-staging-v<version>-<run>)
+# - push to main:        production release (tag desktop-v<version>), same repository rule
+#   (see desktop-bundle.yml for the signing and auto-update secrets)
 # - workflow_dispatch:   installers for the chosen channel as artifacts, no release
 on:
   pull_request:

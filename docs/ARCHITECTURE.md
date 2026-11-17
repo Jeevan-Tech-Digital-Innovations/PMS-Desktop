@@ -14,7 +14,9 @@ Rust core (src-tauri/src/)
    ├─ auth.rs      Axis mobile login/refresh/logout, company switch, keychain
    ├─ api.rs       PMS-API client (token stays in Rust; UI never sees it)
    ├─ timer.rs     timer state machine, heartbeat 30s, active-timer poll 30s, overtime
-   ├─ tracker/     idle.rs · screenshot.rs · apps.rs · power.rs (sleep/lock) · linux.rs (X11/D-Bus)
+   ├─ alive.rs     "last known alive" record + start-up guard decision (section 6)
+   ├─ updater.rs   automatic updates (section 11)
+   ├─ tracker/     idle.rs · screenshot.rs · apps.rs · power.rs (sleep/lock) · linux.rs (X11/D-Bus) · logind.rs (Ubuntu shutdown/sleep)
    ├─ queue.rs     offline queue on disk with backoff
    ├─ settings.rs  employee tracking settings cache (15 min)
    ├─ tray.rs      tray menu + state icons
@@ -48,7 +50,9 @@ Read at startup from environment variables (dev) with compile-time defaults (rel
 | `AXIS_API_URL` | `https://stagingaxisapi.enjev.com` | Axis identity base (paths below add `/api/v1/auth/...`) |
 | `PMS_WEB_URL` | `https://stagingpms.enjev.com` | "Open PMS" target |
 | `PMS_DEV_EMAIL` / `PMS_DEV_PASSWORD` | from the shell | **Debug builds only**: sign in automatically at start-up. Ignored in release builds. |
-| `PMS_DEV_FAST` | `1` to enable | **Debug builds only**: idle 30 s instead of 5 min, auto-stop 2 min instead of 60, screenshot every 60 s, overtime at 3 min. |
+| `PMS_DEV_FAST` | `1` to enable | **Debug builds only**: idle 30 s instead of 5 min, auto-stop 2 min instead of 60, screenshot every 60 s, overtime at 3 min, sleep-stop after 60 s instead of 5 min. |
+| `UPDATER_PUBKEY` | – | **Build time only.** Public key of the update signing key pair (content of the `.pub` file). Empty: the updater is disabled (section 11). |
+| `UPDATER_ENDPOINT` | – | **Build time only.** URL of `latest.json`. Default per channel: production `https://github.com/Jeevan-Tech-Digital-Innovations/PMS-Desktop-Releases/releases/latest/download/latest.json`, staging `…/releases/download/desktop-staging/latest.json`. |
 | `PMS_SELFTEST_HEADLESS` | `1` to enable | `--selftest` only: failing desktop steps (screenshot, active window, idle) are SKIP instead of FAIL. Used by CI. |
 
 ## 2. Axis (identity) — JSON is **snake_case**
@@ -83,12 +87,12 @@ Response shapes: see `src-tauri/src/api.rs`; many wrap data in `{data: ...}`.
 | Tasks of a project | `GET /projects/{projectId}/tasks` |
 | Sub-tasks (also sub-sub) | `GET /tasks/{taskId}/subtasks` |
 | Start | `POST /tasks/{taskId}/time-logs/start` |
-| Stop | `PUT /tasks/{taskId}/time-logs/end` |
+| Stop | `PUT /tasks/{taskId}/time-logs/end`, body optional: `{"endTime": "<ISO-8601 with offset>"}` = when the work really ended (sleep start, last heartbeat, shutdown). Without a body (or with an API that ignores `endTime`) the log ends at the server's now. |
 | State change | `POST /tasks/{taskId}/time-logs/transition` `{newState: ACTIVE_PRODUCTIVE \| PRODUCTIVE_PAUSE \| AWAY \| IDLE \| OVERTIME, effectiveTime}` → new/updated time log |
 | Active timer | `GET /tasks/time-logs/active` |
 | Today totals | `GET /tasks/time-logs/accumulated-today`, `/accumulated-break-today`, `/tasks/{taskId}/time-logs/accumulated-today` |
 | Recent tasks | `GET /tasks/time-logs` (latest distinct tasks) |
-| Heartbeat (**required**: server ends timers with no heartbeat for 15 min) | `PUT /tasks/time-logs/{timeLogId}/heartbeat` every 30 s |
+| Heartbeat (**required**: server ends timers with no heartbeat for 5 min, ending the log at the last heartbeat) | `PUT /tasks/time-logs/{timeLogId}/heartbeat` every 30 s |
 | Breaks | `GET /breaks/reasons`, `POST /tasks/time-logs/{timeLogId}/breaks/start` `{breakReasonId}`, `PUT /tasks/time-logs/{timeLogId}/breaks/stop` |
 | Idle note | `POST /tasks/time-logs/{timeLogId}/notes` `{noteText}` (1–120 chars) |
 | Screenshot | `POST /screenshots/upload/{timeLogId}` multipart: `file` (JPEG), `capturedAt`, `keyboardActivityPercent`, `mouseActivityPercent`, `activeWindowTitle` |
@@ -180,9 +184,54 @@ screen shows a one-time dismissible notice (UI-only flag in `localStorage`): "Fo
 - **Sleep/lock:** detected by a 5 s loop (clock jump > 30 s = slept; lock = idle rising / OS session lock where available) →
   send a heartbeat immediately, pause capture, re-check the active timer on wake. OS lock: Windows = input desktop not
   openable; Linux = `org.gnome.ScreenSaver.GetActive` (session bus), else systemd-logind `LockedHint` of the session
-  (system bus). No answer counts as "not locked".
+  (system bus). No answer counts as "not locked". **A sleep of at least 5 minutes** (`SLEEP_STOP_AFTER`; 60 s with
+  `PMS_DEV_FAST`) stops the timer on wake (any running state) with `endTime` = the moment sleep began (rule D below).
 - **Web timers:** the 30 s active-timer poll picks up a timer started in the web app and starts tracking; if the server
   says no timer, stop tracking (15 s grace after a local start).
+
+### Shutdown, sleep and start-up guard
+
+The server ends an abandoned timer at its last heartbeat after 5 minutes, but until then the web shows "Working", and if
+the computer comes back sooner the 30 s poll would re-adopt the still-open log as a "web timer" so the off time would count
+as work. Three rules close that gap:
+
+**A. Stop on shutdown / restart / log-off (best effort).** `Core::stop_on_exit(3 s)` sends one `PUT …/time-logs/end` with
+`endTime` = now. It runs on its own thread with its own tokio runtime and HTTP client, using the cached access token, and
+shares nothing with the app (no `op` lock, which a poll can hold for 45 s; no app runtime, tray or webview, which can be
+stuck waiting for the blocked UI thread). Uploads (screenshots, app usage) stay in the disk queue; the stop is sent first.
+On success the alive record is deleted; on failure it stays, and rule C ends the log at the next start.
+- **Windows:** tao turns `WM_ENDSESSION` (shutdown, restart, log-off; also the Restart Manager) into `RunEvent::Exit` on the
+  UI thread and ends the process when it returns; `lib.rs` calls `stop_on_exit` there (a no-op when no timer runs, which
+  includes tray Quit, which stops the timer first). `WM_QUERYENDSESSION` is not handled (tao answers "yes").
+  `ShutdownBlockReasonCreate` is deliberately not used: it declares that the app *blocks* shutdown (the user then waits
+  at "this app is preventing shutdown" until the reason is destroyed or they force it), it must be called on the window's
+  thread, and Windows shows the text only for a blocking app, which we are not (we need three seconds).
+- **Ubuntu:** `tracker/logind.rs`, on its own system-bus connection, takes a systemd-logind **delay** inhibitor
+  (`Inhibit("shutdown:sleep", "PMS Desktop", "Stopping your timer", "delay")`) while a timer runs. On
+  `PrepareForShutdown(true)` it calls `stop_on_exit` and drops the inhibitor (logind waits at most `InhibitDelayMaxSec`,
+  5 s by default). On `PrepareForSleep(true)` it records the exact sleep start (used by rule D) and drops the inhibitor at
+  once so suspend is never delayed; after resume the inhibitor is taken again. Log-out and `kill` send **SIGTERM**: the
+  same stop, then the app exits.
+
+**C. Start-up guard (power loss, battery death, forced shutdown, crash).** While a timer runs, `{ timeLogId, taskId,
+lastAliveAt (UTC) }` is written to `<app data>/timer-alive.json` on every heartbeat (30 s) and every state change; only a
+confirmed stop deletes it. At start-up the file is loaded; the **first active-timer poll after sign-in** (under the `op`
+lock, before any adoption) decides: server log id equals the saved id and `now - lastAliveAt > 2 min` → `PUT …/end` with
+`endTime` = `lastAliveAt`, do **not** adopt, and (visible mode) toast + notification "Your timer was stopped at h:mm AM/PM
+when this computer turned off." Another log id (for example started on the web) or no log → the record is dropped and the
+poll behaves as before; within 2 minutes (an app restart) the log is adopted as before. If that call cannot reach the server
+the guard retries on the next poll. An API that ignores `endTime` still ends the log, at now.
+
+**D. Sleep / lid close.** A clock jump of more than 30 s in the 5 s loop is a sleep. Sleeping **under 5 minutes**: as before
+(heartbeat, pause capture, go idle if the gap is at least the idle threshold, re-check the active timer). **5 minutes or
+more:** on wake the timer is stopped with `endTime` = the moment sleep began (the last check before the jump; on Ubuntu the
+exact `PrepareForSleep(true)` time) and the employee is notified "…when this computer went to sleep." If that stop cannot
+reach the server (often no network right after resume) the timer still stops locally and the log is remembered
+(`lastAliveAt` = the sleep start), so the poll ends it before it can be adopted. On Windows **Modern Standby** the PC can keep
+running with the screen off and no clock jump: the app then keeps running and the normal idle rules apply (5 minutes →
+IDLE, 60 minutes → stop).
+
+Pure decision functions with unit tests: `alive::decide`, `alive::clamp_end`, `power::sleep_began`, `power::sleep_stop_at`.
 
 ## 7. Tracking
 
@@ -243,7 +292,31 @@ and the window opens at the top right. Single instance: a second launch focuses 
 | `checks-linux` | ubuntu-22.04 | system packages (`.github/scripts/install-linux-deps.sh`), `cargo test`, clippy |
 | `selftest-windows` | windows-latest | `cargo run -- --selftest` against staging with secrets `PMS_STAGING_TEST_EMAIL` / `PMS_STAGING_TEST_PASSWORD` (read-only: no timers, no uploads; skipped with a notice when unset) |
 | `build` | via `desktop-bundle.yml` | pull requests (staging) and manual runs (`channel` input): Windows NSIS + Ubuntu deb/AppImage as artifacts |
-| `release` | via `desktop-bundle.yml` | push to `build/staging` → pre-release `desktop-staging-v<version>-<run>`; push to `main` → release `desktop-v<version>`; `contents: write` only here |
+| `release` | via `desktop-bundle.yml` | push to `build/staging` → staging pre-release; push to `main` → release `desktop-v<version>`; `contents: write` only here |
+
+**Where releases go.** With the secret `RELEASES_REPO_TOKEN` (fine-grained PAT, *Contents: read and write* on the public
+repository `Jeevan-Tech-Digital-Innovations/PMS-Desktop-Releases`, which needs at least one commit), installers and
+`latest.json` are published there: production as `desktop-v<version>` (the repository's "latest" release), staging as one
+**moving pre-release `desktop-staging`**, deleted (with its tag) and recreated by a job that runs once before the build
+matrix, so `releases/download/desktop-staging/latest.json` is a stable URL. Without the token, releases are created in this
+repository as before (`desktop-staging-v<version>-<run>`) and there is nothing for the updater to read.
 
 Repository variables `PMS_API_URL_<CHANNEL>`, `AXIS_API_URL_<CHANNEL>`, `PMS_WEB_URL_<CHANNEL>` (`STAGING` /
 `PRODUCTION`) override the default URLs.
+
+## 11. Automatic updates (from 2.0.1)
+
+`tauri-plugin-updater` (+ `tauri-plugin-process` for the restart). Each channel reads its own `latest.json` (section 1,
+`UPDATER_ENDPOINT`); packages are signed, the app verifies them against the public key compiled in (`UPDATER_PUBKEY`).
+
+- **Policy** (`updater.rs`): check 1 minute after start-up and every 6 hours; download in the background (signature checked
+  while downloading); **install only when no timer is running** and no timer operation is in flight (the install is done
+  while holding the same `op` lock that start/stop use), then the app restarts. While a timer runs the update waits and the
+  tray shows **Restart to update (vX.Y.Z)**; choosing it asks for confirmation when a timer runs, stops the timer and
+  installs. Windows: the NSIS installer runs in passive mode and starts the app again. Ubuntu: only an **AppImage** (the
+  `APPIMAGE` environment variable is set) can replace itself; a `.deb` install shows **New version available — Download**,
+  which opens the release page.
+- **Disabled** (one log line) when the build has no `UPDATER_PUBKEY`, or the Tauri config has no `plugins.updater`. CI writes
+  that config (`tauri.updater.conf.json`, not committed) together with `bundle.createUpdaterArtifacts: true` only when the
+  signing key and the public key are both configured; unsigned builds still work, they just do not update.
+- A staging build only updates to a **higher version number**: bump `version` for every staging release you want to roll out.

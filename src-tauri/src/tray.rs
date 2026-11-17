@@ -114,14 +114,23 @@ fn structure_key(core: &Core, recent: &[TaskRef], autostart: bool) -> String {
         .unwrap_or_default();
     let s = core.snapshot();
     format!(
-        "{signed}|{}|{:?}|{:?}|{}|{}|{}|{autostart}",
+        "{signed}|{}|{:?}|{:?}|{}|{}|{}|{autostart}|{:?}",
         core.silent(),
         s.state,
         s.task.as_ref().map(|t| t.task_id),
         companies.join(","),
         id.map(|i| i.active_tenant_id).unwrap_or_default(),
         recent.iter().map(|t| t.task_id.to_string()).collect::<Vec<_>>().join(","),
+        crate::updater::status(),
     )
+}
+
+/// The update entry goes just above Quit, set apart by a separator.
+fn with_update<'m>(menu: MenuBuilder<'m, Wry, AppHandle>, update: &Option<MenuItem<Wry>>) -> MenuBuilder<'m, Wry, AppHandle> {
+    match update {
+        Some(u) => menu.separator().item(u),
+        None => menu,
+    }
 }
 
 fn build_menu(
@@ -143,16 +152,19 @@ fn build_menu(
     let toggle = MenuItemBuilder::with_id(toggle_id, toggle_text).enabled(toggle_enabled).build(app)?;
     let stop = MenuItemBuilder::with_id("stop", "Stop").enabled(running).build(app)?;
     let quit = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
+    // "Restart to update (vX.Y.Z)" once an update is downloaded, or "New version available — Download" (.deb).
+    let update = match crate::updater::status().menu_entry() {
+        Some((id, label)) => Some(MenuItemBuilder::with_id(id, label).build(app)?),
+        None => None,
+    };
 
     if !core.auth.is_signed_in() {
         let menu = MenuBuilder::new(app)
             .item(&status_item)
             .separator()
             .text("open", "Sign in…")
-            .text("open_web", "Open PMS")
-            .separator()
-            .item(&quit)
-            .build()?;
+            .text("open_web", "Open PMS");
+        let menu = with_update(menu, &update).separator().item(&quit).build()?;
         return Ok((menu, status_item));
     }
 
@@ -161,10 +173,8 @@ fn build_menu(
             .text("open", "Open")
             .item(&toggle)
             .item(&stop)
-            .text("about", "About")
-            .separator()
-            .item(&quit)
-            .build()?;
+            .text("about", "About");
+        let menu = with_update(menu, &update).separator().item(&quit).build()?;
         return Ok((menu, status_item));
     }
 
@@ -210,10 +220,8 @@ fn build_menu(
         .item(&companies)
         .separator()
         .text("open_web", "Open PMS")
-        .item(&autostart)
-        .separator()
-        .item(&quit)
-        .build()?;
+        .item(&autostart);
+    let menu = with_update(menu, &update).separator().item(&quit).build()?;
     Ok((menu, status_item))
 }
 
@@ -332,6 +340,25 @@ pub fn request_quit(app: &AppHandle) {
         });
 }
 
+/// "Restart to update": with a timer running the employee confirms first; the timer is stopped, then the update installs.
+fn request_update_restart(app: &AppHandle) {
+    let core = app.state::<Arc<Core>>().inner().clone();
+    let app2 = app.clone();
+    if !core.is_running() {
+        tauri::async_runtime::spawn(crate::updater::restart_now(app2, core));
+        return;
+    }
+    app.dialog()
+        .message("A timer is running. Updating stops it and restarts PMS Desktop.")
+        .title("Restart to update?")
+        .buttons(MessageDialogButtons::OkCancelCustom("Stop and update".into(), "Cancel".into()))
+        .show(move |ok| {
+            if ok {
+                tauri::async_runtime::spawn(crate::updater::restart_now(app2, core));
+            }
+        });
+}
+
 fn on_menu(app: &AppHandle, id: &str) {
     match id {
         "pause" => spawn_op(app, |c| async move { report(&c, c.pause_timer().await) }),
@@ -367,6 +394,11 @@ fn on_menu(app: &AppHandle, id: &str) {
                 .title(format!("About {}", crate::config::PRODUCT_NAME))
                 .buttons(MessageDialogButtons::Ok)
                 .show(|_| {});
+        }
+        "update_restart" => request_update_restart(app),
+        "update_download" => {
+            use tauri_plugin_opener::OpenerExt;
+            let _ = app.opener().open_url(crate::updater::release_page(crate::updater::is_staging()), None::<&str>);
         }
         "quit" => request_quit(app),
         other => {
