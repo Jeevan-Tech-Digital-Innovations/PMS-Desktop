@@ -99,9 +99,13 @@ machine:
 | Event | Channel | Result |
 |---|---|---|
 | Pull request | staging | Artifacts only |
-| Push to `build/staging` | staging | GitHub pre-release `desktop-staging-v<version>-<run number>` |
-| Push to `main` | production | GitHub release `desktop-v<version>` |
+| Push to `build/staging` | staging | Pre-release `desktop-staging` (one moving pre-release, recreated each time) |
+| Push to `main` | production | Release `desktop-v<version>` |
 | **Run workflow** (Actions tab) | chosen with the `channel` input | Artifacts only |
+
+Releases are published to the **public** repository `Jeevan-Tech-Digital-Innovations/PMS-Desktop-Releases` (secret
+`RELEASES_REPO_TOKEN`); the installed apps update from there. Without that secret, releases are created in this repository
+as before (`desktop-v<version>`, `desktop-staging-v<version>-<run number>`) and nothing updates automatically.
 
 Artifacts are named `pms-desktop-<channel>-windows` (the NSIS `.exe`) and `pms-desktop-<channel>-ubuntu` (the `.deb` and
 the `.AppImage`). Releases attach the same files.
@@ -127,11 +131,42 @@ the older commit.
 | Kind | Name | Needed for |
 |---|---|---|
 | Secret | `PMS_STAGING_TEST_EMAIL`, `PMS_STAGING_TEST_PASSWORD` | Staging self-test (optional; skipped when unset) |
+| Secret | `RELEASES_REPO_TOKEN` | Publishing to the public releases repository: a fine-grained personal access token with **Contents: read and write** on `PMS-Desktop-Releases` only. Absent: releases stay in this repository. |
+| Secret | `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Signing update packages (see Auto-update). Absent: no update packages. |
+| Variable (or secret) | `UPDATER_PUBKEY` | Public key of that key pair, compiled into the app. Absent: the updater is disabled. |
+| Variable | `UPDATER_ENDPOINT_STAGING`, `UPDATER_ENDPOINT_PRODUCTION` | Optional override of the `latest.json` URLs (defaults below). |
+| Variable | `RELEASES_REPO`, `RELEASES_REPO_BRANCH` | Optional: another releases repository (default `Jeevan-Tech-Digital-Innovations/PMS-Desktop-Releases`) and its default branch (default `main`). |
 | Variable | `PMS_API_URL_STAGING`, `AXIS_API_URL_STAGING`, `PMS_WEB_URL_STAGING` | Optional override of the staging URLs |
 | Variable | `PMS_API_URL_PRODUCTION`, `AXIS_API_URL_PRODUCTION`, `PMS_WEB_URL_PRODUCTION` | Optional override of the production URLs |
 
 The older unsuffixed variables (`PMS_API_URL`, …) are no longer read by CI, so they cannot point a production build at
 staging.
+
+### Auto-update
+
+From 2.0.1 the app updates itself (policy: [ARCHITECTURE.md section 11](docs/ARCHITECTURE.md); employee view:
+[INSTALL.md](docs/INSTALL.md#updates)). One-time setup by the owner:
+
+1. Generate the signing key pair (keep the private key and its password safe; losing it means a manual re-install for everyone):
+   ```sh
+   npx tauri signer generate -w ~/.tauri/pms-desktop.key
+   ```
+   It writes `~/.tauri/pms-desktop.key` (private) and `~/.tauri/pms-desktop.key.pub` (public).
+2. In this repository's settings add the **secrets** `TAURI_SIGNING_PRIVATE_KEY` (the content of the private key file),
+   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (the password you chose) and `RELEASES_REPO_TOKEN` (see above), and the
+   **variable** `UPDATER_PUBKEY` (the content of the `.pub` file).
+3. Make sure `PMS-Desktop-Releases` is public and has at least one commit (for example a README).
+
+Default `latest.json` URLs (compiled in by CI, overridable with `UPDATER_ENDPOINT_*`):
+
+| Channel | URL |
+|---|---|
+| Production | `https://github.com/Jeevan-Tech-Digital-Innovations/PMS-Desktop-Releases/releases/latest/download/latest.json` |
+| Staging | `https://github.com/Jeevan-Tech-Digital-Innovations/PMS-Desktop-Releases/releases/download/desktop-staging/latest.json` |
+
+Without `UPDATER_PUBKEY` or without the signing key the installers still build; the app logs "updater disabled" and does not
+update. A build only updates to a **higher** version number, so bump `version` (`Cargo.toml`, `tauri.conf.json`,
+`package.json`) for every release you want installed apps to pick up, staging included.
 
 To build locally, run `npm run tauri build` (production identity) or
 `npm run tauri build -- --config src-tauri/tauri.staging.conf.json` (staging identity), with the URL variables set for
