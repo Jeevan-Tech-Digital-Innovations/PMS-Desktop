@@ -7,8 +7,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
-use chrono::{DateTime, FixedOffset, Local};
+use chrono::{DateTime, FixedOffset, Local, Utc};
 
+use crate::alive::{self, AliveFile, AliveState};
 use crate::api::{Api, ServerState, TimeLog};
 use crate::auth::{Auth, SecretStore};
 use crate::catalog::{self, Catalog};
@@ -19,7 +20,7 @@ use crate::settings::{SettingsCache, TrackApps, TrackingSettings};
 use crate::timer::{self, Action, ActiveLog, BreakState, TimerModel, Totals};
 use crate::tracker::apps::{self, UsageTracker, WindowInfo};
 use crate::tracker::idle::{self, ActivitySampler};
-use crate::tracker::power::{PowerEvent, PowerWatch};
+use crate::tracker::power::{self, PowerEvent, PowerWatch};
 use crate::tracker::screenshot::{self, ScreenshotSchedule};
 use crate::types::*;
 use crate::ui::Ui;
@@ -34,6 +35,19 @@ struct Track {
     last_window: Option<WindowInfo>,
     usage_log_id: Option<i64>,
 }
+
+/// A log that must be ended at a known time before the poll may adopt it again (see `alive.rs`).
+#[derive(Debug, Clone)]
+struct Pending {
+    state: AliveState,
+    /// Written by a stop that could not reach the server: end it whatever its age.
+    forced: bool,
+    /// Why the timer stopped, for the notice ("turned off"); `None` when the employee was already told.
+    reason: Option<&'static str>,
+}
+
+/// Stopping the timer when the OS shuts down: the whole stop, including the one HTTP call, must fit in this.
+pub const EXIT_STOP_BUDGET: Duration = Duration::from_secs(3);
 
 pub struct Core {
     pub cfg: Config,
@@ -51,6 +65,8 @@ pub struct Core {
     idle_busy: AtomicBool,
     locked: AtomicBool,
     last_resume_attempt: Mutex<Option<Instant>>,
+    alive: AliveFile,
+    pending: Mutex<Option<Pending>>,
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -71,6 +87,9 @@ impl Core {
         let auth = Arc::new(Auth::new(http.clone(), cfg.axis_url.clone(), store));
         let api = Arc::new(Api::new(http, cfg.api_url.clone(), auth.clone()));
         let queue = Arc::new(Queue::new(cfg.data_dir.join("queue")));
+        let alive = AliveFile::new(&cfg.data_dir);
+        // A record left by the previous run: the computer or the app went away without a clean stop.
+        let pending = alive.load().map(|state| Pending { state, forced: false, reason: Some("turned off") });
         Arc::new(Self {
             settings: SettingsCache::new(cfg.timings.settings_ttl),
             cfg,
@@ -87,6 +106,8 @@ impl Core {
             idle_busy: AtomicBool::new(false),
             locked: AtomicBool::new(false),
             last_resume_attempt: Mutex::new(None),
+            alive,
+            pending: Mutex::new(pending),
         })
     }
 
@@ -105,12 +126,44 @@ impl Core {
     }
 
     pub fn emit_timer(&self) -> TimerSnapshot {
+        self.touch_alive();
         let snap = self.snapshot();
         self.ui.emit(events::TIMER_CHANGED, snap.clone());
         if let Some(app) = self.ui.app() {
             crate::tray::refresh(app, self);
         }
         snap
+    }
+
+    /// Write the "last known alive" record while a timer runs (state change or heartbeat). Never deletes: only a
+    /// confirmed stop does, otherwise start-up would erase the very record the guard is about to read.
+    fn touch_alive(&self) {
+        let cur = lock(&self.timer).log.as_ref().map(|l| (l.id, l.task.task_id));
+        if let Some((time_log_id, task_id)) = cur {
+            self.alive.save(&AliveState { time_log_id, task_id, last_alive_at: Utc::now() });
+        }
+    }
+
+    /// Refresh the alive record right now (about to sleep).
+    #[cfg(target_os = "linux")]
+    pub(crate) fn persist_alive_now(&self) {
+        self.touch_alive();
+    }
+
+    /// A stop did not reach the server: remember to end the log at `at` before it can be adopted again.
+    fn remember_pending_end(&self, time_log_id: i64, task_id: i64, at: DateTime<Local>) {
+        let state = AliveState { time_log_id, task_id, last_alive_at: at.with_timezone(&Utc) };
+        self.alive.save(&state);
+        *lock(&self.pending) = Some(Pending { state, forced: true, reason: None });
+    }
+
+    /// Hold the operation lock if nothing else is changing the timer (used by the updater).
+    pub(crate) fn try_lock_op(&self) -> Option<tokio::sync::MutexGuard<'_, ()>> {
+        self.op.try_lock().ok()
+    }
+
+    pub(crate) async fn lock_op(&self) -> tokio::sync::MutexGuard<'_, ()> {
+        self.op.lock().await
     }
 
     fn first_run_path(&self) -> std::path::PathBuf {
@@ -367,7 +420,7 @@ impl Core {
         let prev = lock(&self.timer).log.clone();
         if let Some(prev) = prev {
             self.flush_usage(Local::now());
-            if let Err(e) = self.api.end(prev.task.task_id).await {
+            if let Err(e) = self.api.end(prev.task.task_id, None).await {
                 if e.code == ErrorCode::Offline {
                     return Err(e);
                 }
@@ -443,23 +496,40 @@ impl Core {
     /// `force_local`: stop locally even if the server can't be reached (sign-out, quit, auto-stop).
     pub async fn stop_timer_inner(&self, force_local: bool) -> AppResult<TimerSnapshot> {
         let _g = self.op.lock().await;
-        self.stop_locked(force_local).await
+        self.stop_locked(force_local, None).await
     }
 
-    async fn stop_locked(&self, force_local: bool) -> AppResult<TimerSnapshot> {
-        let task_id = {
+    /// `end_at`: when the work really ended (sleep start); `None` = now. Stops locally even if the server can't be
+    /// reached when `force_local`; the log is then remembered and ended at `end_at` before it can be adopted again.
+    async fn stop_locked(&self, force_local: bool, end_at: Option<DateTime<Local>>) -> AppResult<TimerSnapshot> {
+        let (log_id, task_id, end_at) = {
             let m = lock(&self.timer);
             m.check(Action::Stop)?;
-            m.log.as_ref().map(|l| l.task.task_id)
+            let log = m.log.as_ref();
+            (
+                log.map(|l| l.id),
+                log.map(|l| l.task.task_id),
+                end_at.map(|t| log.map_or(t, |l| alive::clamp_end(t, l.started_at))),
+            )
         };
-        self.flush_usage(Local::now());
-        if let Some(task_id) = task_id
-            && let Err(e) = self.api.end(task_id).await
-        {
-            if !force_local {
-                return Err(e);
+        self.flush_usage(end_at.unwrap_or_else(Local::now));
+        if let Some(task_id) = task_id {
+            match self.api.end(task_id, end_at).await {
+                Ok(()) => {
+                    if let Some(id) = log_id {
+                        self.alive.clear_for(id);
+                    }
+                }
+                Err(e) => {
+                    if !force_local {
+                        return Err(e);
+                    }
+                    log::warn!("server stop failed, stopped locally: {e}");
+                    if let Some(id) = log_id {
+                        self.remember_pending_end(id, task_id, end_at.unwrap_or_else(Local::now));
+                    }
+                }
             }
-            log::warn!("server stop failed, stopped locally: {e}");
         }
         let _ = lock(&self.timer).apply(Action::Stop, Instant::now());
         self.stop_tracking();
@@ -542,7 +612,7 @@ impl Core {
     pub async fn overtime_decision(&self, continue_overtime: bool) -> AppResult<TimerSnapshot> {
         let _g = self.op.lock().await;
         if !continue_overtime {
-            return self.stop_locked(false).await;
+            return self.stop_locked(false, None).await;
         }
         {
             let mut m = lock(&self.timer);
@@ -668,7 +738,7 @@ impl Core {
         if self.timer_state() != TimerState::Idle {
             return;
         }
-        if self.stop_locked(true).await.is_ok() {
+        if self.stop_locked(true, None).await.is_ok() {
             let mins = self.cfg.timings.idle_autostop.as_secs() / 60;
             let msg = format!("Your timer was stopped after {mins} minutes of inactivity.");
             self.ui.prompt(events::IDLE_ENDED, IdleEnded { resumed: false });
@@ -803,6 +873,7 @@ impl Core {
     // ── Server sync ─────────────────────────────────────────────────────────
 
     async fn heartbeat(&self) {
+        self.touch_alive();
         let _ = self.heartbeat_once().await;
     }
 
@@ -821,6 +892,109 @@ impl Core {
                 }
                 Err(e)
             }
+        }
+    }
+
+    /// The adopt guard (docs/ARCHITECTURE.md section 6): called by the poll, under `op`, with the server's active
+    /// log, before it may be adopted. Returns `true` when that log must be treated as "no timer" for this poll
+    /// (we ended it, or will retry ending it).
+    async fn apply_pending_end(&self, active: Option<&TimeLog>, running: bool) -> bool {
+        let Some(p) = lock(&self.pending).clone() else { return false };
+        let server_id = active.and_then(|l| l.id);
+        match alive::decide(&p.state, server_id, Utc::now(), p.forced) {
+            alive::Action::Discard => {
+                *lock(&self.pending) = None;
+                self.alive.clear_for(p.state.time_log_id);
+                false
+            }
+            alive::Action::Adopt => {
+                *lock(&self.pending) = None;
+                false
+            }
+            // Already tracking this very log (adopted or restarted): nothing to end.
+            alive::Action::EndAt(_) if running => {
+                *lock(&self.pending) = None;
+                false
+            }
+            alive::Action::EndAt(at) => {
+                let local = at.with_timezone(&Local);
+                match self.api.end(p.state.task_id, Some(local)).await {
+                    Ok(()) => {
+                        *lock(&self.pending) = None;
+                        self.alive.clear_for(p.state.time_log_id);
+                        if let Some(why) = p.reason {
+                            self.announce_stop(at, why);
+                        }
+                    }
+                    Err(e) if e.is_retryable() => log::info!("ending the old log is postponed: {e}"),
+                    Err(e) => {
+                        // The server refused (for example it closed the log meanwhile). Do not adopt it either:
+                        // its heartbeat timeout closes it.
+                        log::warn!("could not end the old log at {at}: {e}");
+                        *lock(&self.pending) = None;
+                        self.alive.clear_for(p.state.time_log_id);
+                    }
+                }
+                true
+            }
+        }
+    }
+
+    /// "Your timer was stopped at 3:07 PM when this computer turned off." (visible mode: toast + notification).
+    fn announce_stop(&self, at: DateTime<Utc>, why: &str) {
+        let msg = format!("Your timer was stopped at {} when this computer {why}.", alive::clock(at));
+        self.ui.toast(ToastKind::Warning, msg.clone());
+        self.ui.notify("Timer stopped", &msg);
+    }
+
+    /// Wake after a sleep of at least `sleep_stop_after`: end the timer at the moment sleep began.
+    async fn stop_after_sleep(&self, began: DateTime<Local>) {
+        let _g = self.op.lock().await;
+        if !self.is_running() {
+            return;
+        }
+        match self.stop_locked(true, Some(began)).await {
+            Ok(_) => self.announce_stop(began.with_timezone(&Utc), "went to sleep"),
+            Err(e) => log::warn!("stop after sleep: {e}"),
+        }
+    }
+
+    /// OS shutdown, restart or log-off: end a running timer at "now", best effort, within `budget`. Blocking, and
+    /// safe to call from the UI thread (Windows `WM_ENDSESSION`, which is blocked until we return) or any thread:
+    /// the work runs on its own thread with its own tokio runtime and HTTP client, never touching the `op` lock,
+    /// the app's runtime, the tray or the webview, all of which can be stuck waiting for the blocked UI thread.
+    /// Uploads (screenshots, app usage) stay in the disk queue. On failure the alive record remains, so the
+    /// next start ends the log at the last heartbeat.
+    pub fn stop_on_exit(self: &Arc<Self>, budget: Duration) {
+        let running = match self.timer.try_lock() {
+            Ok(m) => m.log.as_ref().map(|l| (l.id, l.task.task_id)),
+            Err(std::sync::TryLockError::Poisoned(p)) => p.into_inner().log.as_ref().map(|l| (l.id, l.task.task_id)),
+            // Held right now: the record on disk has the same ids.
+            Err(std::sync::TryLockError::WouldBlock) => self.alive.load().map(|s| (s.time_log_id, s.task_id)),
+        };
+        let Some((log_id, task_id)) = running else { return };
+        let Some(token) = self.auth.cached_access_token() else { return };
+        let now = Local::now();
+        // If the call below fails, the next start ends the log here.
+        self.alive.save(&AliveState { time_log_id: log_id, task_id, last_alive_at: now.with_timezone(&Utc) });
+        let (tx, rx) = std::sync::mpsc::channel();
+        let c = self.clone();
+        let http_timeout = budget.saturating_sub(Duration::from_millis(500)).max(Duration::from_millis(500));
+        let spawned = std::thread::Builder::new().name("stop-on-exit".into()).spawn(move || {
+            let res = c.api.end_standalone(&token, task_id, now, http_timeout);
+            if res.is_ok() {
+                c.alive.clear_for(log_id);
+            }
+            c.flush_usage(Local::now());
+            let _ = tx.send(res);
+        });
+        if spawned.is_err() {
+            return;
+        }
+        match rx.recv_timeout(budget) {
+            Ok(Ok(())) => log::info!("timer stopped on exit"),
+            Ok(Err(e)) => log::warn!("stop on exit failed (the next start ends it): {e}"),
+            Err(_) => log::warn!("stop on exit timed out (the next start ends it)"),
         }
     }
 
@@ -846,6 +1020,8 @@ impl Core {
             let m = lock(&self.timer);
             (m.is_running(), m.log.as_ref().map(|l| l.id), m.in_grace(now, self.cfg.timings.web_start_grace.as_secs()))
         };
+        // Before any adoption: a log we know must end (computer was off, or a stop that never reached the server).
+        let active = if self.apply_pending_end(active.as_ref(), running).await { None } else { active };
         match active {
             Some(log) if log.id.is_some() && log.task_id.is_some() => {
                 let id = log.id.unwrap_or_default();
@@ -908,6 +1084,10 @@ impl Core {
                 }
             }
             _ => {
+                if !(running && in_grace) {
+                    // The server has nothing open, so no record can be waiting to end anything.
+                    self.alive.clear();
+                }
                 if running && !in_grace {
                     log::info!("server reports no active timer; stopping local tracking");
                     self.flush_usage(Local::now());
@@ -973,12 +1153,51 @@ impl Core {
 
         let c = self.clone();
         tauri::async_runtime::spawn(async move { c.tick_loop().await });
+
+        // Ubuntu: stop the timer on shutdown / restart (systemd-logind) and learn the exact sleep start.
+        #[cfg(target_os = "linux")]
+        crate::tracker::logind::spawn(self.clone());
+
+        // Log-out and `kill` send SIGTERM: stop the timer, then leave.
+        #[cfg(unix)]
+        {
+            let c = self.clone();
+            tauri::async_runtime::spawn(async move { c.exit_on_sigterm().await });
+        }
+    }
+
+    #[cfg(unix)]
+    async fn exit_on_sigterm(self: Arc<Self>) {
+        use tokio::signal::unix::{SignalKind, signal};
+        let Ok(mut term) = signal(SignalKind::terminate()) else { return };
+        if term.recv().await.is_none() {
+            return;
+        }
+        log::info!("SIGTERM: stopping the timer and exiting");
+        let c = self.clone();
+        let _ = tokio::task::spawn_blocking(move || c.stop_on_exit(EXIT_STOP_BUDGET)).await;
+        // Whatever happens next, do not outlive the signal for long.
+        std::thread::spawn(|| {
+            std::thread::sleep(Duration::from_secs(3));
+            std::process::exit(0);
+        });
+        match self.ui.app() {
+            Some(app) => app.exit(0),
+            None => std::process::exit(0),
+        }
     }
 
     async fn on_power(self: &Arc<Self>, ev: PowerEvent) {
         log::info!("power event: {ev:?}");
         match ev {
-            PowerEvent::Woke(gap) => {
+            PowerEvent::Woke { gap, began } => {
+                if self.is_running()
+                    && let Some(at) = power::sleep_stop_at(gap, began, self.cfg.timings.sleep_stop_after)
+                {
+                    self.stop_after_sleep(DateTime::<Local>::from(at)).await;
+                    self.poll_now.notify_one();
+                    return;
+                }
                 self.heartbeat().await;
                 if self.timer_state() == TimerState::Working && gap >= self.cfg.timings.idle_after {
                     self.go_idle(gap.as_secs()).await;

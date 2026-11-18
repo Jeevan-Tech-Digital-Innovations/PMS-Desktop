@@ -48,6 +48,9 @@ fn main() {
     let (identifier, product_name) = app_names();
     println!("cargo:rerun-if-changed=tauri.conf.json");
     println!("cargo:rerun-if-env-changed=TAURI_CONFIG");
+    // Compiled in (option_env!) by src/updater.rs; the public key switches the updater on.
+    println!("cargo:rerun-if-env-changed=UPDATER_PUBKEY");
+    println!("cargo:rerun-if-env-changed=UPDATER_ENDPOINT");
     println!("cargo:rustc-env=PMS_APP_IDENTIFIER={identifier}");
     println!("cargo:rustc-env=PMS_PRODUCT_NAME={product_name}");
 
